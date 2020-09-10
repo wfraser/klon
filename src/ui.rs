@@ -67,9 +67,7 @@ impl CursesUI {
         curs_set(0); // hide the cursor
         start_color(); // set up color mode
         main_window.nodelay(false); // use blocking getch
-        main_window.keypad(true); // enable getting arrow keys and other special keys
-        cbreak(); // raw input
-        noecho(); // hide user input
+        nocbreak(); // enable simple terminal line editing, only yield input on newline.
 
         init_pair(WHITE_ON_BLACK, COLOR_WHITE, COLOR_BLACK);
         init_pair(RED_ON_BLACK, COLOR_RED, COLOR_BLACK);
@@ -81,26 +79,21 @@ impl CursesUI {
         // 123456 12345678901
         // __DD__ _W1 _W2 _W3
         // draw 3 10X 10Y 10Z
-        let draw_button = main_window.derwin(3,  6, 0, 0).unwrap();
-        let waste       = main_window.derwin(3, 11, 0, 8).unwrap();
+        let draw_button = main_window.derwin(2,  6, 0, 0).unwrap();
+        let waste       = main_window.derwin(2, 11, 0, 8).unwrap();
 
         // Stacks of cards:
         let tableau = init_array!(Window, 7, |i| {
-            main_window.derwin(21, 7, 3, 7 * i as i32).unwrap()
+            main_window.derwin(21, 7, 5, 7 * i as i32).unwrap()
         });
 
         // The foundation, where cards are stacked up by suit.
         // Just shows one card at a time.
         let foundation = init_array!(Window, 4, |i| {
-            main_window.derwin(3, 5, 0, 29 + 5 * i as i32).unwrap()
+            main_window.derwin(2, 5, 0, 29 + 5 * i as i32).unwrap()
         });
 
-        let text_window = main_window.derwin(
-            main_window.get_max_y() - 21,
-            main_window.get_max_x(),
-            21,
-            0,
-        ).unwrap();
+        let text_window = main_window.derwin(1, 49, 3, 0).unwrap();
 
         Self {
             main_window,
@@ -194,9 +187,37 @@ impl CursesUI {
             }
         }
 
-        self.text_window.draw_box('|', '-');
+        let prompt = "your move: ";
+        self.text_window.addstr(prompt);
+        self.text_window.mv(prompt.len() as i32, 0);
+    }
 
-        self.main_window.getch();
+    pub fn get_input(&self) -> Option<String> {
+        let mut line = String::new();
+        curs_set(1);
+
+        self.text_window.refresh();
+
+        loop {
+            let input = match self.main_window.getch() {
+                Some(input) => input,
+                None => {
+                    curs_set(0);
+                    return None;
+                }
+            };
+
+            if let Input::Character(c) = input {
+                if c == '\n' {
+                    break;
+                }
+                line.push(c);
+            } else {
+                eprintln!("{:?}", input);
+            }
+        }
+
+        Some(line)
     }
 }
 

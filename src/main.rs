@@ -42,4 +42,6 @@ fn main() {
 
     let ui = ui::CursesUI::new();
     ui.render(&game);
+
+    eprintln!("{:?}", ui.get_input());
 }
