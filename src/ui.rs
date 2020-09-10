@@ -126,7 +126,11 @@ impl CursesUI {
         self.draw_button.color(Color::Normal);
         let stock_size = game.stock_size().min(3);
         if stock_size == 0 {
-            self.draw_button.addstr("recycle");
+            if game.waste().is_empty() {
+                self.draw_button.addstr(" empty");
+            } else {
+                self.draw_button.addstr("recycle");
+            }
         } else {
             self.draw_button.addstr(&format!("draw {}", stock_size));
         }
