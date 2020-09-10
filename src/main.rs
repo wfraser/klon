@@ -41,7 +41,18 @@ fn main() {
     game.draw_three();
 
     let ui = ui::CursesUI::new();
-    ui.render(&game);
 
-    eprintln!("{:?}", ui.get_input());
+    loop {
+        ui.render(&game);
+        let input = match ui.get_input() {
+            None => break,
+            Some(line) => line,
+        };
+
+        if matches!(input.as_str(), "q" | "quit") {
+            break;
+        }
+
+        eprintln!("{:?}", input);
+    }
 }

@@ -3,7 +3,6 @@ use crate::init_array;
 use pancurses::*;
 
 pub struct CursesUI {
-    main_window: Window,
     draw_button: Window,
     waste: Window,
     tableau: [Window; 7],
@@ -62,11 +61,11 @@ impl CursesUI {
 
     pub fn new() -> Self {
         Self::platform_specific_init();
-        let main_window = initscr();
+        initscr();
 
         curs_set(0); // hide the cursor
         start_color(); // set up color mode
-        main_window.nodelay(false); // use blocking getch
+        use_default_colors();
         nocbreak(); // enable simple terminal line editing, only yield input on newline.
 
         init_pair(WHITE_ON_BLACK, COLOR_WHITE, COLOR_BLACK);
@@ -79,24 +78,24 @@ impl CursesUI {
         // 123456 12345678901
         // __DD__ _W1 _W2 _W3
         // draw 3 10X 10Y 10Z
-        let draw_button = main_window.derwin(2,  6, 0, 0).unwrap();
-        let waste       = main_window.derwin(2, 11, 0, 8).unwrap();
+        let draw_button = newwin(2,  6, 0, 0);
+        let waste       = newwin(2, 11, 0, 8);
 
         // Stacks of cards:
         let tableau = init_array!(Window, 7, |i| {
-            main_window.derwin(21, 7, 5, 7 * i as i32).unwrap()
+            newwin(21, 7, 5, 7 * i as i32)
         });
 
         // The foundation, where cards are stacked up by suit.
         // Just shows one card at a time.
         let foundation = init_array!(Window, 4, |i| {
-            main_window.derwin(2, 5, 0, 29 + 5 * i as i32).unwrap()
+            newwin(2, 5, 0, 29 + 5 * i as i32)
         });
 
-        let text_window = main_window.derwin(1, 49, 3, 0).unwrap();
+        let text_window = newwin(1, 49, 3, 0);
+        text_window.nodelay(false); // use blocking getch
 
         Self {
-            main_window,
             draw_button,
             waste,
             tableau,
@@ -119,6 +118,7 @@ impl CursesUI {
     }
 
     pub fn render(&self, game: &GameState) {
+        self.draw_button.mv(0, 0);
         self.draw_button.color(Color::Gray);
         self.draw_button.attron(A_UNDERLINE);
         self.draw_button.addstr("  DD  ");
@@ -130,8 +130,10 @@ impl CursesUI {
         } else {
             self.draw_button.addstr(&format!("draw {}", stock_size));
         }
+        self.draw_button.refresh();
 
         let waste = game.waste();
+        self.waste.mv(0, 0);
         if waste.is_empty() {
             self.waste.erase();
             self.waste.addstr("\n  empty");
@@ -150,8 +152,10 @@ impl CursesUI {
                 self.waste.addstr(" ");
             }
         }
+        self.waste.refresh();
 
         for (i, win) in self.foundation.iter().enumerate() {
+            win.mv(0, 0);
             win.color(Color::Gray);
             win.attron(A_UNDERLINE);
             win.addstr(&format!(" 0{} ", (b'A' + i as u8) as char));
@@ -167,9 +171,12 @@ impl CursesUI {
                     win.addstr("  () ");
                 }
             }
+
+            win.refresh();
         }
 
         for (i, win) in self.tableau.iter().enumerate() {
+            win.mv(0, 0);
             win.color(Color::Gray);
             //win.addstr("1234567");
             win.attron(A_UNDERLINE);
@@ -185,24 +192,39 @@ impl CursesUI {
                     win.addstr("\n");
                 }
             }
+            win.refresh();
         }
 
         let prompt = "your move: ";
+        self.text_window.erase();
         self.text_window.addstr(prompt);
-        self.text_window.mv(prompt.len() as i32, 0);
+        self.text_window.mv(0, prompt.len() as i32);
+        self.text_window.refresh();
     }
+
+    /*
+    pub fn refresh(&self) {
+        self.draw_button.refresh();
+        self.waste.refresh();
+        for win in &self.tableau {
+            win.refresh();
+        }
+        for win in &self.foundation {
+            win.refresh();
+        }
+        self.text_window.refresh();
+    }
+    */
 
     pub fn get_input(&self) -> Option<String> {
         let mut line = String::new();
-        curs_set(1);
-
-        self.text_window.refresh();
+        curs_set(1); // turn on cursor while we're getting input
 
         loop {
-            let input = match self.main_window.getch() {
+            let input = match self.text_window.getch() {
                 Some(input) => input,
                 None => {
-                    curs_set(0);
+                    curs_set(0); // turn cursor back off
                     return None;
                 }
             };
