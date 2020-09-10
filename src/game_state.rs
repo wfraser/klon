@@ -155,14 +155,6 @@ mod test_stock {
 }
 
 #[derive(Debug)]
-pub enum Location {
-    Waste(usize),
-    Foundation(usize),
-    Tableau { column: usize, row: Option<usize> },
-    Deal,
-}
-
-#[derive(Debug)]
 pub struct GameState {
     stock: Stock,
     foundation: [Vec<Card>; 4],
@@ -207,5 +199,9 @@ impl GameState {
         self.foundation[idx].last()
         //let rank = unsafe { std::mem::transmute::<_, Rank>((10 - idx) as u8) };
         //Some(Card { suit: Suit::Hearts, rank })
+    }
+
+    pub fn take_waste_temp_hax(&mut self) -> Option<Card> {
+        self.stock.take()
     }
 }

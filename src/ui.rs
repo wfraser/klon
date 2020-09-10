@@ -133,23 +133,27 @@ impl CursesUI {
         self.draw_button.refresh();
 
         let waste = game.waste();
+        self.waste.erase();
         self.waste.mv(0, 0);
         if waste.is_empty() {
-            self.waste.erase();
             self.waste.addstr("\n  empty");
         } else {
             self.waste.color(Color::Gray);
             for i in 0 .. waste.len() {
-                self.waste.attron(A_UNDERLINE);
-                self.waste.addstr(&format!(" W{}", i + 1));
-                self.waste.attroff(A_UNDERLINE);
+                if i == waste.len() - 1 {
+                    self.waste.attron(A_UNDERLINE);
+                    self.waste.addstr(&format!(" W "));
+                    self.waste.attroff(A_UNDERLINE);
+                    self.waste.mv(1, 0);
+                } else {
+                    self.waste.addstr("    ");
+                }
+            }
+            for (i, card) in waste.iter().enumerate() {
+                Self::render_card(&self.waste, card);
                 if i != waste.len() - 1 {
                     self.waste.addstr(" ");
                 }
-            }
-            for card in waste {
-                Self::render_card(&self.waste, card);
-                self.waste.addstr(" ");
             }
         }
         self.waste.refresh();
