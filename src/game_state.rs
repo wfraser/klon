@@ -155,6 +155,14 @@ mod test_stock {
 }
 
 #[derive(Debug)]
+pub enum Location {
+    Waste(usize),
+    Foundation(usize),
+    Tableau { column: usize, row: Option<usize> },
+    Deal,
+}
+
+#[derive(Debug)]
 pub struct GameState {
     stock: Stock,
     foundation: [Vec<Card>; 4],

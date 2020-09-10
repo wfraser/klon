@@ -92,7 +92,7 @@ impl CursesUI {
             newwin(2, 5, 0, 29 + 5 * i as i32)
         });
 
-        let text_window = newwin(1, 49, 3, 0);
+        let text_window = newwin(2, 49, 3, 0);
         text_window.nodelay(false); // use blocking getch
 
         Self {
@@ -196,9 +196,9 @@ impl CursesUI {
         }
 
         let prompt = "your move: ";
-        self.text_window.erase();
+        self.text_window.mv(0, 0);
+        self.text_window.clrtoeol();
         self.text_window.addstr(prompt);
-        self.text_window.mv(0, prompt.len() as i32);
         self.text_window.refresh();
     }
 
@@ -235,11 +235,20 @@ impl CursesUI {
                 }
                 line.push(c);
             } else {
-                eprintln!("{:?}", input);
+                eprintln!("unrecognized input {:?}", input);
             }
         }
 
+        curs_set(0);
+
+        // Clear the text line under the prompt before returning.
+        self.text_window.mv(1, 0);
+        self.text_window.deleteln();
         Some(line)
+    }
+
+    pub fn write(&self, txt: &str) {
+        self.text_window.mvaddstr(1, 0, txt);
     }
 }
 
