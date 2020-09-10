@@ -57,13 +57,14 @@ fn main() {
             }
         };
 
-        if let Action::Quit = action {
-            break;
-        }
-
-        // FIXME
-        if let Action::Move(Location::Waste, _) = action {
-            game.take_waste_temp_hax();
+        match action {
+            Action::Quit => break,
+            Action::Move(Location::Waste, _) => {
+                // FIXME temp hax
+                game.take_waste_temp_hax();
+            }
+            Action::Draw => { game.draw_three(); }
+            _ => (), // TODO
         }
 
         ui.write(&format!("{:?}", action));
@@ -84,12 +85,12 @@ enum Location {
 #[derive(Debug)]
 enum Action {
     Quit,
-    Deal,
+    Draw,
     Move(Location, Location),
     QuickMove(Location),
 }
 
-fn parse_location(game: &GameState, chars: &mut impl Iterator<Item=char>)
+fn parse_location(game: &GameState, mut chars: impl Iterator<Item=char>)
     -> Result<Location, &'static str>
 {
     let c = chars.next().unwrap();
@@ -133,7 +134,7 @@ fn parse_action(game: &GameState, s: &str) -> Result<Action, &'static str> {
     match s.to_ascii_uppercase().as_str() {
         "" => return Err("enter 'quit' to exit"),
         "Q" | "QUIT" => return Ok(Action::Quit),
-        "DD" => return Ok(Action::Deal),
+        "DD" => return Ok(Action::Draw),
         _ => (),
     }
 
