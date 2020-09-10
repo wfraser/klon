@@ -1,5 +1,3 @@
-use crate::game_state::GameState;
-
 #[derive(Debug)]
 pub enum Location {
     Waste,
@@ -15,16 +13,14 @@ pub enum Action {
     QuickMove(Location),
 }
 
-/*
 impl std::str::FromStr for Action {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Action, Self::Err> {
         parse_action(s)
     }
 }
-*/
 
-fn parse_location(game: &GameState, mut chars: impl Iterator<Item=char>)
+fn parse_location(mut chars: impl Iterator<Item=char>)
     -> Result<Location, &'static str>
 {
     let c = chars.next().unwrap();
@@ -41,13 +37,8 @@ fn parse_location(game: &GameState, mut chars: impl Iterator<Item=char>)
                 // destination.
                 return Ok(Location::Tableau { column, row: None });
             }
-            // Get the length of the column to figure out what the max valid letter is.
-            let len = game.tableau(column).len();
-            if len != 0 {
-                let max = (b'A' + len as u8 - 1) as char;
-                if let Some(row) = get_int(next.iter().cloned(), 'A', max) {
-                    return Ok(Location::Tableau { column, row: Some(row) });
-                }
+            if let Some(row) = get_int(next.iter().cloned(), 'A', 'Z') {
+                return Ok(Location::Tableau { column, row: Some(row) });
             }
         }
         _ => (),
@@ -64,7 +55,7 @@ fn get_int(mut chars: impl Iterator<Item = char>, min: char, max: char) -> Optio
     None
 }
 
-pub fn parse_action(game: &GameState, s: &str) -> Result<Action, &'static str> {
+fn parse_action(s: &str) -> Result<Action, &'static str> {
     match s.to_ascii_uppercase().as_str() {
         "" => return Err("enter 'quit' to exit"),
         "Q" | "QUIT" => return Ok(Action::Quit),
@@ -73,7 +64,7 @@ pub fn parse_action(game: &GameState, s: &str) -> Result<Action, &'static str> {
     }
 
     let mut chars = s.chars().map(|c| c.to_ascii_uppercase()).peekable();
-    let source = parse_location(game, &mut chars)?;
+    let source = parse_location(&mut chars)?;
     if let Location::Tableau { column: _, row } = source {
         if row.is_none() {
             return Err("unrecognized input");
@@ -85,7 +76,7 @@ pub fn parse_action(game: &GameState, s: &str) -> Result<Action, &'static str> {
         return Ok(Action::QuickMove(source));
     }
 
-    let dest = parse_location(game, &mut chars)?;
+    let dest = parse_location(&mut chars)?;
     if let Location::Waste = dest {
         return Err("can't move a card to the waste pile");
     }

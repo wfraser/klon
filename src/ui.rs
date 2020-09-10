@@ -203,11 +203,6 @@ impl CursesUI {
             win.refresh();
         }
 
-        let prompt = "your move: ";
-        self.text_window.mv(0, 0);
-        self.text_window.clrtoeol();
-        self.text_window.addstr(prompt);
-        self.text_window.refresh();
     }
 
     /*
@@ -226,6 +221,12 @@ impl CursesUI {
 
     pub fn get_input(&self) -> Option<String> {
         let mut line = String::new();
+
+        let prompt = "your move: ";
+        self.text_window.mv(0, 0);
+        self.text_window.clrtoeol();
+        self.text_window.addstr(prompt);
+        self.text_window.refresh();
         curs_set(1); // turn on cursor while we're getting input
 
         loop {
