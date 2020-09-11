@@ -331,9 +331,11 @@ impl GameState {
                     if let Some((_, Facing::Down)) = self.tableau.get(column)
                         .and_then(|cards| cards.get(row))
                     {
-                        // flip card
-                        self.tableau[column][row].1 = Facing::Up;
-                        return Ok(());
+                        if self.is_bottom_of_tableau(column, row) {
+                            // flip card
+                            self.tableau[column][row].1 = Facing::Up;
+                            return Ok(());
+                        }
                     }
                 }
 
