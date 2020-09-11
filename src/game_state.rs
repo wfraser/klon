@@ -1,6 +1,7 @@
 use crate::init_array;
+use crate::action::{Action, Location};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Suit {
     Spades,
     Clubs,
@@ -20,7 +21,23 @@ impl std::fmt::Display for Suit {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Color {
+    Red,
+    Black,
+}
+
+impl Suit {
+    pub fn color(self) -> Color {
+        use Suit::*;
+        match self {
+            Spades | Clubs => Color::Black,
+            Hearts | Diamonds => Color::Red,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
 #[allow(dead_code)] // only constructed via the primitive, using transmute
 pub enum Rank {
@@ -37,6 +54,12 @@ pub enum Rank {
     Jack,
     Queen,
     King,
+}
+
+impl Rank {
+    pub fn value(self) -> u8 {
+        self as u8
+    }
 }
 
 impl std::fmt::Display for Rank {
@@ -203,5 +226,127 @@ impl GameState {
 
     pub fn take_waste_temp_hax(&mut self) -> Option<Card> {
         self.stock.take()
+    }
+
+    fn can_stack_tableau(&self, card: &Card, column: usize) -> Result<(), &'static str> {
+        match self.tableau.get(column).ok_or("no such column")?.last() {
+            None => {
+                if card.rank == Rank::King {
+                    Ok(())
+                } else {
+                    Err("only King can go on empty tableau space")
+                }
+            }
+            Some((_, Facing::Down)) => Err("cannot place on face-down card"),
+            Some((parent, Facing::Up)) => {
+                if parent.suit.color() == card.suit.color() {
+                    Err("cards must differ in color")
+                } else if parent.rank.value() != card.rank.value() + 1 {
+                    Err("card value is not one higher than that being placed")
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    fn can_stack_foundation(&self, card: &Card, column: usize) -> Result<(), &'static str> {
+        match self.foundation.get(column).ok_or("no such column")?.last() {
+            None => {
+                if card.rank == Rank::Ace {
+                    Ok(())
+                } else {
+                    Err("only Ace can go on empty foundation space")
+                }
+            }
+            Some(parent) => {
+                if parent.suit != card.suit {
+                    Err("cards must match in suit")
+                } else if parent.rank.value() + 1 != card.rank.value() {
+                    Err("card value is not one lower than that being placed")
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    pub fn apply_action(&mut self, action: Action) -> Result<(), &'static str> {
+        match action {
+            Action::Quit => (),
+            Action::Move(Location::Foundation(_), _)
+                | Action::QuickMove(Location::Foundation(_)) =>
+            {
+                return Err("can't move from the foundation");
+            }
+            Action::Move(Location::Tableau { column: _, row: None }, _)
+                | Action::QuickMove(Location::Tableau { column: _, row: None }) =>
+            {
+                panic!("tableau move src must specify a row");
+            }
+            Action::Move(_, Location::Tableau { column: _, row: Some(_) }) => {
+                return Err("only specify destination tableau column number");
+            }
+            Action::Move(_, Location::Waste) => return Err("can't move to the waste"),
+            Action::Draw => {
+                self.draw_three();
+            }
+            Action::Move(src, dest) => {
+                let (src, tableau_position) = self.get_src_card_ref(&src)?;
+                match dest {
+                    Location::Tableau { column, row: None } => {
+                        self.can_stack_tableau(src, column)?;
+                    }
+                    Location::Foundation(column) => {
+                        if let Some((src_col, src_row)) = tableau_position {
+                            if !self.is_bottom_of_tableau(src_col, src_row) {
+                                return Err("can only pop off the bottom card of a stack");
+                            }
+                        }
+                        self.can_stack_foundation(src, column)?;
+                    }
+                    _ => unreachable!(), // handled above
+                }
+
+                return Err("yeah okay that's a good move");
+            }
+            Action::QuickMove(src) => {
+                let (src, tableau_position) = self.get_src_card_ref(&src)?;
+                if let Some((col, row)) = tableau_position {
+                    if !self.is_bottom_of_tableau(col, row) {
+                        return Err("can only pop off the bottom card of a stack");
+                    }
+                }
+
+                return Err("yeah ok");
+            }
+        }
+        Ok(())
+    }
+
+    fn get_src_card_ref(&self, location: &Location) -> Result<(&Card, Option<(usize, usize)>), &'static str> {
+        match location {
+            Location::Waste => match self.stock.showing().last() {
+                Some(card) => Ok((card, None)),
+                None => Err("waste is empty"),
+            },
+            Location::Tableau { column, row: Some(row) } => match self.tableau
+                .get(*column)
+                .and_then(|cards| cards.get(*row))
+            {
+                Some((card, Facing::Up)) => {
+                    Ok((card, Some((*column, *row))))
+                }
+                Some((_, Facing::Down)) => Err("cannot move face-down card"),
+                None => Err("no card there"),
+            }
+            _ => unreachable!(), // handled above
+        }
+    }
+
+    fn is_bottom_of_tableau(&self, column: usize, row: usize) -> bool {
+        self.tableau.get(column)
+            .and_then(|cards| cards.get(row + 1))
+            .is_none()
     }
 }

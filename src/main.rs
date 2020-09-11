@@ -2,7 +2,7 @@ mod action;
 mod game_state;
 mod ui;
 
-use action::{Action, Location};
+use action::Action;
 use game_state::{Card, GameState, Rank, Suit};
 
 #[macro_export]
@@ -61,32 +61,13 @@ fn main() {
             }
         };
 
-        match action {
-            Action::Quit => break,
-            Action::Move(Location::Waste, _) => {
-                if game.waste().is_empty() {
-                    // FIXME this should be in the move logic
-                    ui.write("waste is empty");
-                } else {
-                    // FIXME temp hax
-                    game.take_waste_temp_hax();
-                }
-            }
-            Action::Move(Location::Foundation(_), _)
-                | Action::QuickMove(Location::Foundation(_))
-                => {
-                // TODO: some games do allow this
-                ui.write("can't move from the foundation");
-            }
-            Action::Move(Location::Tableau { column, row }, dest) => {
-                ui.write(&format!("move {}:{} to {:?}", column+1, row.unwrap()+1, dest));
-            }
-            Action::QuickMove(src) => {
-                ui.write(&format!("quick move {:?}", src));
-            }
-            Action::Draw => {
-                game.draw_three();
-            }
+        if let Action::Quit = action {
+            break;
+        }
+
+        if let Err(e) = game.apply_action(action) {
+            ui.write(e);
+            continue;
         }
     }
 
