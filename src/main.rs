@@ -69,6 +69,14 @@ fn main() {
             ui.write(e);
             continue;
         }
+
+        if (0..4)
+            .all(|i| game.foundation(i)
+                .map(|card| card.rank)
+                    == Some(Rank::King))
+        {
+            ui.write("YOU'RE WINNER !"); // lol
+        }
     }
 
     drop(ui);
