@@ -184,6 +184,7 @@ impl CursesUI {
         }
 
         for (i, win) in self.tableau.iter().enumerate() {
+            win.erase();
             win.mv(0, 0);
             win.color(Color::Gray);
             //win.addstr("1234567");

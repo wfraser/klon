@@ -224,10 +224,6 @@ impl GameState {
         //Some(Card { suit: Suit::Hearts, rank })
     }
 
-    pub fn take_waste_temp_hax(&mut self) -> Option<Card> {
-        self.stock.take()
-    }
-
     fn can_stack_tableau(&self, card: &Card, column: usize) -> Result<(), &'static str> {
         match self.tableau.get(column).ok_or("no such column")?.last() {
             None => {
@@ -292,10 +288,10 @@ impl GameState {
                 self.draw_three();
             }
             Action::Move(src, dest) => {
-                let (src, tableau_position) = self.get_src_card_ref(&src)?;
+                let (card_ref, tableau_position) = self.get_src_card_ref(&src)?;
                 match dest {
                     Location::Tableau { column, row: None } => {
-                        self.can_stack_tableau(src, column)?;
+                        self.can_stack_tableau(card_ref, column)?;
                     }
                     Location::Foundation(column) => {
                         if let Some((src_col, src_row)) = tableau_position {
@@ -303,22 +299,72 @@ impl GameState {
                                 return Err("can only pop off the bottom card of a stack");
                             }
                         }
-                        self.can_stack_foundation(src, column)?;
+                        self.can_stack_foundation(card_ref, column)?;
                     }
                     _ => unreachable!(), // handled above
                 }
 
-                return Err("yeah okay that's a good move");
+                match (src, dest) {
+                    (Location::Waste, Location::Foundation(column)) => {
+                        self.foundation[column].push(self.stock.take().unwrap());
+                    }
+                    (Location::Waste, Location::Tableau { column, row: None }) => {
+                        self.tableau[column].push((self.stock.take().unwrap(), Facing::Up));
+                    }
+                    (Location::Tableau { column, row: Some(row) }, Location::Foundation(idx)) => {
+                        self.foundation[idx].push(self.tableau[column].remove(row).0);
+                    }
+                    (Location::Tableau { column: src_col, row: Some(src_row) },
+                        Location::Tableau { column: dst_col, row: None }) =>
+                    {
+                        while self.tableau[src_col].get(src_row).is_some() {
+                            let (card, facing) = self.tableau[src_col].remove(src_row);
+                            self.tableau[dst_col].push((card, facing));
+                        }
+                    }
+                    _ => unreachable!(),
+                };
             }
             Action::QuickMove(src) => {
-                let (src, tableau_position) = self.get_src_card_ref(&src)?;
+                // Unfortunately a big duplication of get_src_card_ref...
+                if let Location::Tableau { column, row: Some(row) } = src {
+                    if let Some((_, Facing::Down)) = self.tableau.get(column)
+                        .and_then(|cards| cards.get(row))
+                    {
+                        // flip card
+                        self.tableau[column][row].1 = Facing::Up;
+                        return Ok(());
+                    }
+                }
+
+                let (card_ref, tableau_position) = self.get_src_card_ref(&src)?;
+
                 if let Some((col, row)) = tableau_position {
                     if !self.is_bottom_of_tableau(col, row) {
                         return Err("can only pop off the bottom card of a stack");
                     }
                 }
 
-                return Err("yeah ok");
+                let mut foundation_idx = None;
+                for i in 0 .. 4 {
+                    if self.can_stack_foundation(card_ref, i).is_ok() {
+                        foundation_idx = Some(i);
+                        break;
+                    }
+                }
+
+                match foundation_idx {
+                    Some(i) => {
+                        self.foundation[i].push(match src {
+                            Location::Waste => self.stock.take().unwrap(),
+                            Location::Tableau { column, row: Some(row) } => {
+                                self.tableau[column].remove(row).0
+                            }
+                            _ => unreachable!(),
+                        });
+                    }
+                    None => return Err("can't put that on any of the foundation stacks"),
+                }
             }
         }
         Ok(())
