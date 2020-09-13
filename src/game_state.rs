@@ -1,5 +1,5 @@
 use crate::init_array;
-use crate::action::{Action, Location};
+use crate::action::{Action, Destination, Source};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Suit {
@@ -279,30 +279,16 @@ impl GameState {
     pub fn apply_action(&mut self, action: Action) -> Result<(), &'static str> {
         match action {
             Action::Quit | Action::Help => (),
-            Action::Move(Location::Foundation(_), _)
-                | Action::QuickMove(Location::Foundation(_)) =>
-            {
-                return Err("can't move from the foundation");
-            }
-            Action::Move(Location::Tableau { column: _, row: None }, _)
-                | Action::QuickMove(Location::Tableau { column: _, row: None }) =>
-            {
-                panic!("tableau move src must specify a row");
-            }
-            Action::Move(_, Location::Tableau { column: _, row: Some(_) }) => {
-                return Err("only specify destination tableau column number");
-            }
-            Action::Move(_, Location::Waste) => return Err("can't move to the waste"),
             Action::Draw => {
                 self.draw_three();
             }
             Action::Move(src, dest) => {
                 let (card_ref, tableau_position) = self.get_src_card_ref(&src)?;
                 match dest {
-                    Location::Tableau { column, row: None } => {
+                    Destination::Tableau(column) => {
                         self.can_stack_tableau(card_ref, column)?;
                     }
-                    Location::Foundation(column) => {
+                    Destination::Foundation(column) => {
                         if let Some((src_col, src_row)) = tableau_position {
                             if !self.is_bottom_of_tableau(src_col, src_row) {
                                 return Err("can only pop off the bottom card of a stack");
@@ -310,33 +296,31 @@ impl GameState {
                         }
                         self.can_stack_foundation(card_ref, column)?;
                     }
-                    _ => unreachable!(), // handled above
                 }
 
                 match (src, dest) {
-                    (Location::Waste, Location::Foundation(column)) => {
+                    (Source::Waste, Destination::Foundation(column)) => {
                         self.foundation[column].push(self.stock.take().unwrap());
                     }
-                    (Location::Waste, Location::Tableau { column, row: None }) => {
+                    (Source::Waste, Destination::Tableau(column)) => {
                         self.tableau[column].push((self.stock.take().unwrap(), Facing::Up));
                     }
-                    (Location::Tableau { column, row: Some(row) }, Location::Foundation(idx)) => {
+                    (Source::Tableau { column, row }, Destination::Foundation(idx)) => {
                         self.foundation[idx].push(self.tableau[column].remove(row).0);
                     }
-                    (Location::Tableau { column: src_col, row: Some(src_row) },
-                        Location::Tableau { column: dst_col, row: None }) =>
+                    (Source::Tableau { column: src_col, row: src_row },
+                        Destination::Tableau(dst_col)) =>
                     {
                         while self.tableau[src_col].get(src_row).is_some() {
                             let (card, facing) = self.tableau[src_col].remove(src_row);
                             self.tableau[dst_col].push((card, facing));
                         }
                     }
-                    _ => unreachable!(),
                 };
             }
             Action::QuickMove(src) => {
                 // Unfortunately a big duplication of get_src_card_ref...
-                if let Location::Tableau { column, row: Some(row) } = src {
+                if let Source::Tableau { column, row } = src {
                     if let Some((_, Facing::Down)) = self.tableau.get(column)
                         .and_then(|cards| cards.get(row))
                     {
@@ -367,11 +351,10 @@ impl GameState {
                 match foundation_idx {
                     Some(i) => {
                         self.foundation[i].push(match src {
-                            Location::Waste => self.stock.take().unwrap(),
-                            Location::Tableau { column, row: Some(row) } => {
+                            Source::Waste => self.stock.take().unwrap(),
+                            Source::Tableau { column, row } => {
                                 self.tableau[column].remove(row).0
                             }
-                            _ => unreachable!(),
                         });
                     }
                     None => return Err("can't put that on any of the foundation stacks"),
@@ -381,13 +364,13 @@ impl GameState {
         Ok(())
     }
 
-    fn get_src_card_ref(&self, location: &Location) -> Result<(&Card, Option<(usize, usize)>), &'static str> {
+    fn get_src_card_ref(&self, location: &Source) -> Result<(&Card, Option<(usize, usize)>), &'static str> {
         match location {
-            Location::Waste => match self.stock.showing().last() {
+            Source::Waste => match self.stock.showing().last() {
                 Some(card) => Ok((card, None)),
                 None => Err("waste is empty"),
             },
-            Location::Tableau { column, row: Some(row) } => match self.tableau
+            Source::Tableau { column, row } => match self.tableau
                 .get(*column)
                 .and_then(|cards| cards.get(*row))
             {
@@ -397,7 +380,6 @@ impl GameState {
                 Some((_, Facing::Down)) => Err("cannot move face-down card"),
                 None => Err("no card there"),
             }
-            _ => unreachable!(), // handled above
         }
     }
 

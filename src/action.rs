@@ -1,10 +1,17 @@
+use std::iter::Peekable;
+
 const UNRECOGNIZED: &str = "unrecognized input. try 'help' or 'quit'";
 
 #[derive(Debug)]
-pub enum Location {
+pub enum Source {
     Waste,
+    Tableau { column: usize, row: usize },
+}
+
+#[derive(Debug)]
+pub enum Destination {
     Foundation(usize),
-    Tableau { column: usize, row: Option<usize> },
+    Tableau(usize),
 }
 
 #[derive(Debug)]
@@ -12,8 +19,8 @@ pub enum Action {
     Quit,
     Help,
     Draw,
-    Move(Location, Location),
-    QuickMove(Location),
+    Move(Source, Destination),
+    QuickMove(Source),
 }
 
 impl std::str::FromStr for Action {
@@ -23,27 +30,49 @@ impl std::str::FromStr for Action {
     }
 }
 
-fn parse_location(mut chars: impl Iterator<Item=char>)
-    -> Result<Location, &'static str>
+fn parse_source(chars: &mut Peekable<impl Iterator<Item=char>>)
+    -> Result<Source, &'static str>
 {
-    let c = chars.next().unwrap();
+    let c = match chars.next() {
+        Some(c) => c,
+        None => return Err(UNRECOGNIZED),
+    };
     match c {
-        'W' => return Ok(Location::Waste),
+        'W' => return Ok(Source::Waste),
+        '0' => return Err("can't move from the foundation"),
+        '1' | '2' | '3' | '4' | '5' | '6' | '7' => {
+            let column = (c as u32 - '1' as u32) as usize;
+            if chars.peek().is_none() {
+                return Err("missing a tableau row letter");
+            }
+            if let Some(row) = get_int(chars, 'A', 'Z') {
+                return Ok(Source::Tableau { column, row });
+            }
+        }
+        _ => (),
+    }
+    Err(UNRECOGNIZED)
+}
+
+fn parse_destination(chars: &mut Peekable<impl Iterator<Item=char>>)
+    -> Result<Destination, &'static str>
+{
+    let c = match chars.next() {
+        Some(c) => c,
+        None => return Err(UNRECOGNIZED),
+    };
+    match c {
         '0' => if let Some(idx) = get_int(chars, 'A', 'D') {
-            return Ok(Location::Foundation(idx));
+            return Ok(Destination::Foundation(idx));
         }
         '1' | '2' | '3' | '4' | '5' | '6' | '7' => {
             let column = (c as u32 - '1' as u32) as usize;
-            let next = chars.next();
-            if next.is_none() {
-                // No row specified: refers to the column as a whole. Only valid when used as a
-                // destination.
-                return Ok(Location::Tableau { column, row: None });
+            if chars.peek().is_some() {
+                return Err("extra input after tableau column number");
             }
-            if let Some(row) = get_int(next.iter().cloned(), 'A', 'Z') {
-                return Ok(Location::Tableau { column, row: Some(row) });
-            }
+            return Ok(Destination::Tableau(column));
         }
+        'W' => return Err("can't move to the waste"),
         _ => (),
     }
     Err(UNRECOGNIZED)
@@ -68,21 +97,17 @@ fn parse_action(s: &str) -> Result<Action, &'static str> {
     }
 
     let mut chars = s.chars().map(|c| c.to_ascii_uppercase()).peekable();
-    let source = parse_location(&mut chars)?;
-    if let Location::Tableau { column: _, row } = source {
-        if row.is_none() {
-            return Err(UNRECOGNIZED);
-        }
-    }
+    let source = parse_source(&mut chars)?;
 
     if chars.peek().is_none() {
         // let the game figure out if this is valid or not
         return Ok(Action::QuickMove(source));
     }
 
-    let dest = parse_location(&mut chars)?;
-    if let Location::Waste = dest {
-        return Err("can't move a card to the waste pile");
+    let dest = parse_destination(&mut chars)?;
+
+    if chars.peek().is_some() {
+        return Err("unrecognized extra input after move");
     }
 
     Ok(Action::Move(source, dest))
