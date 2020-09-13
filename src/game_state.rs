@@ -269,7 +269,7 @@ impl GameState {
 
     pub fn apply_action(&mut self, action: Action) -> Result<(), &'static str> {
         match action {
-            Action::Quit => (),
+            Action::Quit | Action::Help => (),
             Action::Move(Location::Foundation(_), _)
                 | Action::QuickMove(Location::Foundation(_)) =>
             {

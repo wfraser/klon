@@ -99,6 +99,11 @@ fn main() {
             break;
         }
 
+        if let Action::Help = action {
+            ui.halp();
+            continue;
+        }
+
         if let Err(e) = game.apply_action(action) {
             ui.write(e);
             continue;

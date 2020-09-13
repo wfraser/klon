@@ -249,6 +249,18 @@ impl CursesUI {
     pub fn write(&self, txt: &str) {
         self.text_window.mvaddstr(1, 0, txt);
     }
+
+    pub fn halp(&self) {
+        let win = newwin(10, 40, 4, 4);
+        win.mv(1,1);
+        win.addstr("help text should go here...\n");
+        win.addstr("press any key to return to game");
+        win.draw_box('|', '-');
+        cbreak();
+        win.getch();
+        nocbreak();
+        win.delwin();
+    }
 }
 
 impl Drop for CursesUI {

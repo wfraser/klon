@@ -8,6 +8,7 @@ pub enum Location {
 #[derive(Debug)]
 pub enum Action {
     Quit,
+    Help,
     Draw,
     Move(Location, Location),
     QuickMove(Location),
@@ -59,6 +60,7 @@ fn parse_action(s: &str) -> Result<Action, &'static str> {
     match s.to_ascii_uppercase().as_str() {
         "" => return Err("enter 'quit' to exit"),
         "Q" | "QUIT" => return Ok(Action::Quit),
+        "HELP" => return Ok(Action::Help),
         "DD" => return Ok(Action::Draw),
         _ => (),
     }
