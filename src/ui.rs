@@ -27,7 +27,6 @@ enum Color {
     Gray,
     Normal,
     Red,
-    White,
 }
 
 trait WindowExt {
@@ -42,7 +41,7 @@ impl WindowExt for Window {
                 Gray => COLOR_PAIR(BLACK_ON_BLACK as chtype) | A_BOLD,
                 Normal => COLOR_PAIR(WHITE_ON_BLACK as chtype),
                 Red => COLOR_PAIR(RED_ON_BLACK as chtype),
-                White => COLOR_PAIR(WHITE_ON_BLACK as chtype) | A_BOLD,
+                //White => COLOR_PAIR(WHITE_ON_BLACK as chtype) | A_BOLD,
             }
         );
     }
@@ -59,7 +58,7 @@ impl CursesUI {
         unsafe { libc::setlocale(libc::LC_ALL, b"\0" as *const _ as *const libc::c_char) };
     }
 
-    pub fn new() -> Self {
+    pub fn new(game_number: u64) -> Self {
         Self::platform_specific_init();
         initscr();
 
@@ -78,22 +77,26 @@ impl CursesUI {
         // 123456 12345678901
         // __DD__ _W1 _W2 _W3
         // draw 3 10X 10Y 10Z
-        let draw_button = newwin(2,  6, 0, 0);
-        let waste       = newwin(2, 11, 0, 8);
+        let draw_button = newwin(2,  6, 1, 0);
+        let waste       = newwin(2, 11, 1, 8);
 
         // Stacks of cards:
         let tableau = init_array!(Window, 7, |i| {
-            newwin(21, 7, 5, 7 * i as i32)
+            newwin(21, 7, 6, 7 * i as i32)
         });
 
         // The foundation, where cards are stacked up by suit.
         // Just shows one card at a time.
         let foundation = init_array!(Window, 4, |i| {
-            newwin(2, 5, 0, 29 + 5 * i as i32)
+            newwin(2, 5, 1, 29 + 5 * i as i32)
         });
 
-        let text_window = newwin(2, 49, 3, 0);
+        let text_window = newwin(2, 49, 4, 0);
         text_window.nodelay(false); // use blocking getch
+
+        let game = newwin(1, 26, 0, 15);
+        game.addstr(&format!("game #{}", game_number));
+        game.refresh();
 
         Self {
             draw_button,
@@ -146,7 +149,7 @@ impl CursesUI {
             for i in 0 .. waste.len() {
                 if i == waste.len() - 1 {
                     self.waste.attron(A_UNDERLINE);
-                    self.waste.addstr(&format!(" W "));
+                    self.waste.addstr(" W ");
                     self.waste.attroff(A_UNDERLINE);
                     self.waste.mv(1, 0);
                 } else {
@@ -205,20 +208,6 @@ impl CursesUI {
         }
 
     }
-
-    /*
-    pub fn refresh(&self) {
-        self.draw_button.refresh();
-        self.waste.refresh();
-        for win in &self.tableau {
-            win.refresh();
-        }
-        for win in &self.foundation {
-            win.refresh();
-        }
-        self.text_window.refresh();
-    }
-    */
 
     pub fn get_input(&self) -> Option<String> {
         let mut line = String::new();

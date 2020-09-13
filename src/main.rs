@@ -2,8 +2,13 @@ mod action;
 mod game_state;
 mod ui;
 
-use action::Action;
-use game_state::{Card, GameState, Rank, Suit};
+use crate::action::Action;
+use crate::game_state::{Card, GameState, Rank, Suit};
+use getrandom::getrandom;
+use rand::{Rng, SeedableRng};
+use rand_pcg::Pcg32;
+use std::env::args;
+use std::process::exit;
 
 #[macro_export]
 macro_rules! init_array {
@@ -29,7 +34,6 @@ macro_rules! init_array {
 
 fn main() {
     let mut deck = vec![];
-
     for rank in 1u8 ..= 13u8 {
         for suit in [Suit::Spades, Suit::Clubs, Suit::Hearts, Suit::Diamonds].iter().cloned() {
             let rank: Rank = unsafe { std::mem::transmute(rank) };
@@ -38,11 +42,41 @@ fn main() {
         }
     }
 
+    let seed = match args().nth(1).as_deref() {
+        Some("-h") | Some("--help") => {
+            eprintln!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+            eprintln!("usage: {} [<game number>]", args().next().unwrap());
+            exit(1);
+        }
+        Some(n) => {
+            match n.parse::<u64>() {
+                Ok(n) => n,
+                Err(e) => {
+                    eprintln!("invalid game number: {}", e);
+                    exit(2);
+                }
+            }
+        }
+        None => {
+            let mut bytes = [0u8; 8];
+            getrandom(&mut bytes).expect("unable to get random bytes");
+            u64::from_le_bytes(bytes)
+        }
+    };
+
+    // Randomize the deck in a repeatable way by seeding a RNG with the given number and using that
+    // to do swaps of cards in the deck.
+    // The number of permutations of a 52-card deck is 52!, which is a 226-bit number, and we're
+    // only using a 64-bit seed, and not doing this n a meticulous way, so obviously this can't
+    // generate all possible decks, but it's proooooobably good enough.
+    let mut rand = <Pcg32 as SeedableRng>::seed_from_u64(seed);
+    for i in 0 .. deck.len() {
+        let j = rand.gen_range(i, deck.len());
+        deck.swap(i, j);
+    }
+
     let mut game = GameState::new(deck);
-
-    game.draw_three();
-
-    let ui = ui::CursesUI::new();
+    let ui = ui::CursesUI::new(seed);
 
     loop {
         ui.render(&game);
@@ -81,5 +115,6 @@ fn main() {
 
     drop(ui);
 
+    println!("That was game #{}.", seed);
     println!("Bye!");
 }
