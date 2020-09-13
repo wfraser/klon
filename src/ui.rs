@@ -1,4 +1,4 @@
-use crate::game_state::{Card, Facing, GameState, Suit};
+use crate::game_state::{Card, Color as CardColor, Facing, GameState};
 use crate::init_array;
 use pancurses::*;
 
@@ -14,14 +14,6 @@ pub struct CursesUI {
 const WHITE_ON_BLACK: i16 = 0;
 const RED_ON_BLACK: i16 = 1;
 const BLACK_ON_BLACK: i16 = 2;
-
-/*
-#[cfg(windows)]
-const A_DIM: chtype = 0x8000_0000;
-
-#[cfg(unix)]
-const A_DIM: chtype = 0x0010_0000;
-*/
 
 #[derive(Debug, Copy, Clone)]
 enum Color {
@@ -110,9 +102,9 @@ impl CursesUI {
         if card_str.len() == 4 { // UTF-8: 3 for suit, 1 for rank
             win.addstr(" "); // pad to two graphemes
         }
-        let color = match card.suit {
-            Suit::Hearts | Suit::Diamonds => Color::Red,
-            Suit::Clubs | Suit::Spades => Color::Normal,
+        let color = match card.suit.color() {
+            CardColor::Red => Color::Red,
+            CardColor::Black => Color::Normal,
         };
         win.color(color);
         win.addstr(&card_str);
@@ -191,7 +183,6 @@ impl CursesUI {
             win.erase();
             win.mv(0, 0);
             win.color(Color::Gray);
-            //win.addstr("1234567");
             win.attron(A_UNDERLINE);
             win.addstr(&format!("     {}\n", i + 1));
             win.attroff(A_UNDERLINE);

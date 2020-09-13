@@ -35,11 +35,15 @@ impl Suit {
             Hearts | Diamonds => Color::Red,
         }
     }
+
+    pub fn all() -> &'static [Suit] {
+        use Suit::*;
+        &[Spades, Clubs, Hearts, Diamonds]
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
-#[allow(dead_code)] // only constructed via the primitive, using transmute
 pub enum Rank {
     Ace = 1,
     N2,
@@ -59,6 +63,11 @@ pub enum Rank {
 impl Rank {
     pub fn value(self) -> u8 {
         self as u8
+    }
+
+    pub fn all() -> &'static [Rank] {
+        use Rank::*;
+        &[Ace, N2, N3, N4, N5, N6, N7, N8, N9, N10, Jack, Queen, King]
     }
 }
 
@@ -222,8 +231,6 @@ impl GameState {
 
     pub fn foundation(&self, idx: usize) -> Option<&Card> {
         self.foundation[idx].last()
-        //let rank = unsafe { std::mem::transmute::<_, Rank>((10 - idx) as u8) };
-        //Some(Card { suit: Suit::Hearts, rank })
     }
 
     fn can_stack_tableau(&self, card: &Card, column: usize) -> Result<(), &'static str> {

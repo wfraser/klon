@@ -34,9 +34,8 @@ macro_rules! init_array {
 
 fn main() {
     let mut deck = vec![];
-    for rank in 1u8 ..= 13u8 {
-        for suit in [Suit::Spades, Suit::Clubs, Suit::Hearts, Suit::Diamonds].iter().cloned() {
-            let rank: Rank = unsafe { std::mem::transmute(rank) };
+    for &rank in Rank::all() {
+        for &suit in Suit::all() {
             let card = Card { suit, rank };
             deck.push(card);
         }
