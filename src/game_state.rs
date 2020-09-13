@@ -283,13 +283,13 @@ impl GameState {
                 self.draw_three();
             }
             Action::Move(src, dest) => {
-                let (card_ref, tableau_position) = self.get_src_card_ref(&src)?;
+                let card_ref = self.get_src_card_ref(&src)?;
                 match dest {
                     Destination::Tableau(column) => {
                         self.can_stack_tableau(card_ref, column)?;
                     }
                     Destination::Foundation(column) => {
-                        if let Some((src_col, src_row)) = tableau_position {
+                        if let Source::Tableau { column: src_col, row: src_row } = src {
                             if !self.is_bottom_of_tableau(src_col, src_row) {
                                 return Err("can only pop off the bottom card of a stack");
                             }
@@ -332,10 +332,10 @@ impl GameState {
                     }
                 }
 
-                let (card_ref, tableau_position) = self.get_src_card_ref(&src)?;
+                let card_ref = self.get_src_card_ref(&src)?;
 
-                if let Some((col, row)) = tableau_position {
-                    if !self.is_bottom_of_tableau(col, row) {
+                if let Source::Tableau { column, row } = src {
+                    if !self.is_bottom_of_tableau(column, row) {
                         return Err("can only pop off the bottom card of a stack");
                     }
                 }
@@ -364,10 +364,10 @@ impl GameState {
         Ok(())
     }
 
-    fn get_src_card_ref(&self, location: &Source) -> Result<(&Card, Option<(usize, usize)>), &'static str> {
+    fn get_src_card_ref(&self, location: &Source) -> Result<&Card, &'static str> {
         match location {
             Source::Waste => match self.stock.showing().last() {
-                Some(card) => Ok((card, None)),
+                Some(card) => Ok(card),
                 None => Err("waste is empty"),
             },
             Source::Tableau { column, row } => match self.tableau
@@ -375,7 +375,7 @@ impl GameState {
                 .and_then(|cards| cards.get(*row))
             {
                 Some((card, Facing::Up)) => {
-                    Ok((card, Some((*column, *row))))
+                    Ok(card)
                 }
                 Some((_, Facing::Down)) => Err("cannot move face-down card"),
                 None => Err("no card there"),
