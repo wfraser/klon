@@ -3,6 +3,7 @@ use crate::init_array;
 use pancurses::*;
 
 pub struct CursesUI {
+    main_window: Window,
     draw_button: Window,
     waste: Window,
     tableau: [Window; 7],
@@ -58,9 +59,9 @@ impl CursesUI {
         unsafe { libc::setlocale(libc::LC_ALL, b"\0" as *const _ as *const libc::c_char) };
     }
 
-    pub fn new(game_number: u64) -> Self {
+    pub fn new() -> Self {
         Self::platform_specific_init();
-        initscr();
+        let main_window = initscr();
 
         curs_set(0); // hide the cursor
         start_color(); // set up color mode
@@ -94,11 +95,8 @@ impl CursesUI {
         let text_window = newwin(2, 49, 4, 0);
         text_window.nodelay(false); // use blocking getch
 
-        let game = newwin(1, 26, 0, 15);
-        game.addstr(&format!("game #{}", game_number));
-        game.refresh();
-
         Self {
+            main_window,
             draw_button,
             waste,
             tableau,
@@ -121,6 +119,9 @@ impl CursesUI {
     }
 
     pub fn render(&self, game: &GameState) {
+        self.main_window.mvaddstr(0, 10, &format!("game #{}", game.game_number()));
+        self.main_window.refresh();
+
         self.draw_button.mv(0, 0);
         self.draw_button.color(Color::Gray);
         self.draw_button.attron(A_UNDERLINE);
@@ -251,15 +252,30 @@ impl CursesUI {
     }
 
     pub fn halp(&self) {
-        let win = newwin(10, 40, 4, 4);
-        win.mv(1,1);
-        win.addstr("help text should go here...\n");
-        win.addstr("press any key to return to game");
+        let win = newwin(13, 40, 2, 4);
+        // Note the space before the line-continuation backslash; it makes room for the border.
+        win.addstr("\n \
+                    Move cards by typing the position of\n \
+                    the card to be moved, followed by the\n \
+                    destination. The columns of cards are\n \
+                    numbered, and the rows are letters. To\n \
+                    place at the bottom of a column, just\n \
+                    specify the column number. Flip a\n \
+                    face-down card over by just typing its\n \
+                    position, without any destination. As\n \
+                    a shortcut, moves to the foundation\n \
+                    can omit the destination.\n \
+                    Press any key to return to the game.");
         win.draw_box('|', '-');
+
         cbreak();
         win.getch();
         nocbreak();
         win.delwin();
+
+        // Clear and redraw the screen because we drew in between windows.
+        self.main_window.erase();
+        self.main_window.refresh();
     }
 }
 

@@ -75,8 +75,8 @@ fn main() {
         deck.swap(i, j);
     }
 
-    let mut game = GameState::new(deck);
-    let ui = ui::CursesUI::new(seed);
+    let mut game = GameState::new(seed, deck);
+    let ui = ui::CursesUI::new();
 
     loop {
         ui.render(&game);

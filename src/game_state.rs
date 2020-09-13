@@ -179,13 +179,14 @@ mod test_stock {
 
 #[derive(Debug)]
 pub struct GameState {
+    game_number: u64,
     stock: Stock,
     foundation: [Vec<Card>; 4],
     tableau: [Vec<(Card, Facing)>; 7],
 }
 
 impl GameState {
-    pub fn new(mut cards: Vec<Card>) -> Self {
+    pub fn new(game_number: u64, mut cards: Vec<Card>) -> Self {
         let mut tableau = init_array!(Vec<(Card, Facing)>, 7, |_| vec![]);
 
         for (i, column) in tableau.iter_mut().enumerate() {
@@ -196,6 +197,7 @@ impl GameState {
         }
 
         Self {
+            game_number,
             stock: Stock::new(cards),
             foundation: init_array!(Vec<Card>, 4, |_| vec![]),
             tableau,
@@ -396,5 +398,9 @@ impl GameState {
         self.tableau.get(column)
             .and_then(|cards| cards.get(row + 1))
             .is_none()
+    }
+
+    pub fn game_number(&self) -> u64 {
+        self.game_number
     }
 }

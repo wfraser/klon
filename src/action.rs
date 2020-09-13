@@ -1,3 +1,5 @@
+const UNRECOGNIZED: &str = "unrecognized input. try 'help' or 'quit'";
+
 #[derive(Debug)]
 pub enum Location {
     Waste,
@@ -44,7 +46,7 @@ fn parse_location(mut chars: impl Iterator<Item=char>)
         }
         _ => (),
     }
-    Err("unrecognized input")
+    Err(UNRECOGNIZED)
 }
 
 fn get_int(mut chars: impl Iterator<Item = char>, min: char, max: char) -> Option<usize> {
@@ -58,7 +60,7 @@ fn get_int(mut chars: impl Iterator<Item = char>, min: char, max: char) -> Optio
 
 fn parse_action(s: &str) -> Result<Action, &'static str> {
     match s.to_ascii_uppercase().as_str() {
-        "" => return Err("enter 'quit' to exit"),
+        "" => return Err("enter 'quit' to exit, or try 'help'"),
         "Q" | "QUIT" => return Ok(Action::Quit),
         "HELP" => return Ok(Action::Help),
         "DD" => return Ok(Action::Draw),
@@ -69,7 +71,7 @@ fn parse_action(s: &str) -> Result<Action, &'static str> {
     let source = parse_location(&mut chars)?;
     if let Location::Tableau { column: _, row } = source {
         if row.is_none() {
-            return Err("unrecognized input");
+            return Err(UNRECOGNIZED);
         }
     }
 
