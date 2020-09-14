@@ -11,4 +11,9 @@ getrandom = "0.2.0"
 libc = "0.2"
 rand = { version = "0.7.3", default-features = false }
 rand_pcg = "0.2.1"
-pancurses = "0.16.1"
+
+[dependencies.pancurses]
+version = "0.16.1"
+# Run in the win32 console host, not in an extra window.
+# This limits the graphics significantly, however.
+features = ["win32"]

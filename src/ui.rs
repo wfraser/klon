@@ -24,6 +24,7 @@ enum Color {
 
 trait WindowExt {
     fn color(&self, color: Color);
+    fn underline(&self, enabled: bool);
 }
 
 impl WindowExt for Window {
@@ -38,6 +39,19 @@ impl WindowExt for Window {
             }
         );
     }
+
+    #[cfg(unix)]
+    fn underline(&self, enabled: bool) {
+        if enabled {
+            self.attron(A_UNDERLINE);
+        } else {
+            self.attroff(A_UNDERLINE);
+        }
+    }
+
+    // Underline doesn't do what we want on pdcurses win32.
+    #[cfg(windows)]
+    fn underline(&self, _enabled: bool) {}
 }
 
 impl CursesUI {
@@ -62,7 +76,14 @@ impl CursesUI {
 
         init_pair(WHITE_ON_BLACK, COLOR_WHITE, COLOR_BLACK);
         init_pair(RED_ON_BLACK, COLOR_RED, COLOR_BLACK);
-        init_pair(BLACK_ON_BLACK, COLOR_BLACK, COLOR_BLACK); // must be used with intensifier
+
+        // This must be used with A_BOLD to be visible, as dark gray.
+        #[cfg(unix)]
+        init_pair(BLACK_ON_BLACK, COLOR_BLACK, COLOR_BLACK);
+
+        // pdcurses win32 can't do gray, so do this dark blue instead.
+        #[cfg(windows)]
+        init_pair(BLACK_ON_BLACK, COLOR_BLUE, COLOR_BLACK);
 
         // The stock & waste draw area:
         //
@@ -116,9 +137,9 @@ impl CursesUI {
 
         self.draw_button.mv(0, 0);
         self.draw_button.color(Color::Gray);
-        self.draw_button.attron(A_UNDERLINE);
+        self.draw_button.underline(true);
         self.draw_button.addstr("  DD  ");
-        self.draw_button.attroff(A_UNDERLINE);
+        self.draw_button.underline(false);
         self.draw_button.color(Color::Normal);
         let stock_size = game.stock_size().min(3);
         if stock_size == 0 {
@@ -141,9 +162,9 @@ impl CursesUI {
             self.waste.color(Color::Gray);
             for i in 0 .. waste.len() {
                 if i == waste.len() - 1 {
-                    self.waste.attron(A_UNDERLINE);
+                    self.waste.underline(true);
                     self.waste.addstr(" W ");
-                    self.waste.attroff(A_UNDERLINE);
+                    self.waste.underline(false);
                     self.waste.mv(1, 0);
                 } else {
                     self.waste.addstr("    ");
@@ -161,9 +182,9 @@ impl CursesUI {
         for (i, win) in self.foundation.iter().enumerate() {
             win.mv(0, 0);
             win.color(Color::Gray);
-            win.attron(A_UNDERLINE);
+            win.underline(true);
             win.addstr(&format!(" 0{} ", (b'A' + i as u8) as char));
-            win.attroff(A_UNDERLINE);
+            win.underline(false);
 
             match game.foundation(i) {
                 Some(card) => {
@@ -183,9 +204,9 @@ impl CursesUI {
             win.erase();
             win.mv(0, 0);
             win.color(Color::Gray);
-            win.attron(A_UNDERLINE);
+            win.underline(true);
             win.addstr(&format!("     {}\n", i + 1));
-            win.attroff(A_UNDERLINE);
+            win.underline(false);
             for (j, (card, facing)) in game.tableau(i).iter().enumerate() {
                 win.addstr(&format!("{}{} ", i + 1, (b'A' + j as u8) as char));
                 if matches!(facing, Facing::Down) {
@@ -198,7 +219,6 @@ impl CursesUI {
             }
             win.refresh();
         }
-
     }
 
     pub fn get_input(&self) -> Option<String> {
