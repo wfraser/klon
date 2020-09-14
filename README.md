@@ -35,3 +35,7 @@ same order, to be dealt again.
 When you start `klon` without any command-line arguments, it randomizes the
 deck, but it gives you a "game number" that can be used to generate that same
 deck again. Run `klon` with that number as an argument to play it again.
+
+`klon` logs a record of your moves to standard error, which is hidden due to
+the game running in ncurses. You can redirect it to a file to save it, i.e.:
+    `klon 123456789 2>log_123456789`

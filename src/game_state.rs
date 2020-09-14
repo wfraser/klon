@@ -276,7 +276,7 @@ impl GameState {
         }
     }
 
-    pub fn apply_action(&mut self, action: Action) -> Result<(), &'static str> {
+    pub fn apply_action(&mut self, action: &Action) -> Result<(), &'static str> {
         match action {
             Action::Quit | Action::Help => (),
             Action::Draw => {
@@ -284,12 +284,12 @@ impl GameState {
             }
             Action::Move(src, dest) => {
                 let card_ref = self.get_src_card_ref(&src)?;
-                match dest {
+                match *dest {
                     Destination::Tableau(column) => {
                         self.can_stack_tableau(card_ref, column)?;
                     }
                     Destination::Foundation(column) => {
-                        if let Source::Tableau { column: src_col, row: src_row } = src {
+                        if let Source::Tableau { column: src_col, row: src_row } = *src {
                             if !self.is_bottom_of_tableau(src_col, src_row) {
                                 return Err("can only pop off the bottom card of a stack");
                             }
@@ -299,17 +299,17 @@ impl GameState {
                 }
 
                 match (src, dest) {
-                    (Source::Waste, Destination::Foundation(column)) => {
+                    (Source::Waste, &Destination::Foundation(column)) => {
                         self.foundation[column].push(self.stock.take().unwrap());
                     }
-                    (Source::Waste, Destination::Tableau(column)) => {
+                    (Source::Waste, &Destination::Tableau(column)) => {
                         self.tableau[column].push((self.stock.take().unwrap(), Facing::Up));
                     }
-                    (Source::Tableau { column, row }, Destination::Foundation(idx)) => {
+                    (&Source::Tableau { column, row }, &Destination::Foundation(idx)) => {
                         self.foundation[idx].push(self.tableau[column].remove(row).0);
                     }
-                    (Source::Tableau { column: src_col, row: src_row },
-                        Destination::Tableau(dst_col)) =>
+                    (&Source::Tableau { column: src_col, row: src_row },
+                        &Destination::Tableau(dst_col)) =>
                     {
                         while self.tableau[src_col].get(src_row).is_some() {
                             let (card, facing) = self.tableau[src_col].remove(src_row);
@@ -320,7 +320,7 @@ impl GameState {
             }
             Action::QuickMove(src) => {
                 // Unfortunately a big duplication of get_src_card_ref...
-                if let Source::Tableau { column, row } = src {
+                if let Source::Tableau { column, row } = *src {
                     if let Some((_, Facing::Down)) = self.tableau.get(column)
                         .and_then(|cards| cards.get(row))
                     {
@@ -332,9 +332,9 @@ impl GameState {
                     }
                 }
 
-                let card_ref = self.get_src_card_ref(&src)?;
+                let card_ref = self.get_src_card_ref(src)?;
 
-                if let Source::Tableau { column, row } = src {
+                if let Source::Tableau { column, row } = *src {
                     if !self.is_bottom_of_tableau(column, row) {
                         return Err("can only pop off the bottom card of a stack");
                     }
@@ -350,7 +350,7 @@ impl GameState {
 
                 match foundation_idx {
                     Some(i) => {
-                        self.foundation[i].push(match src {
+                        self.foundation[i].push(match *src {
                             Source::Waste => self.stock.take().unwrap(),
                             Source::Tableau { column, row } => {
                                 self.tableau[column].remove(row).0

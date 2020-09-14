@@ -2,12 +2,13 @@ mod action;
 mod game_state;
 mod ui;
 
-use crate::action::Action;
+use crate::action::{Action, Destination, Source};
 use crate::game_state::{Card, GameState, Rank, Suit};
 use getrandom::getrandom;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg32;
 use std::env::args;
+use std::io::{self, Write};
 use std::process::exit;
 
 #[macro_export]
@@ -94,17 +95,19 @@ fn main() {
             }
         };
 
+        if let Err(e) = game.apply_action(&action) {
+            ui.write(e);
+            continue;
+        }
+
+        log_action(&action, io::stderr()).unwrap();
+
         if let Action::Quit = action {
             break;
         }
 
         if let Action::Help = action {
             ui.halp();
-            continue;
-        }
-
-        if let Err(e) = game.apply_action(action) {
-            ui.write(e);
             continue;
         }
 
@@ -121,4 +124,31 @@ fn main() {
 
     println!("That was game #{}.", seed);
     println!("Bye!");
+}
+
+fn log_action(action: &Action, mut w: impl Write) -> io::Result<()> {
+    match action {
+        Action::Quit => writeln!(w, "QUIT")?,
+        Action::Draw => writeln!(w, "DD")?,
+        Action::Move(src, dst) => {
+            match src {
+                Source::Waste => write!(w, "W")?,
+                Source::Tableau { column, row } =>
+                    write!(w, "{}{}", column + 1, (b'A' + *row as u8) as char)?,
+            }
+            match dst {
+                Destination::Foundation(idx) =>
+                    write!(w, "0{}", (b'A' + *idx as u8) as char)?,
+                Destination::Tableau(column) => write!(w, "{}", column + 1)?,
+            }
+            writeln!(w)?;
+        }
+        Action::QuickMove(src) => match src {
+            Source::Waste => writeln!(w, "W")?,
+            Source::Tableau { column, row } =>
+                writeln!(w, "{}{}", column + 1, (b'A' + *row as u8) as char)?,
+        }
+        _ => (),
+    }
+    Ok(())
 }
