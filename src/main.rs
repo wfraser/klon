@@ -8,7 +8,8 @@ use getrandom::getrandom;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg32;
 use std::env::args;
-use std::io::{self, Write};
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, Write};
 use std::process::exit;
 
 #[macro_export]
@@ -64,27 +65,41 @@ fn main() {
         }
     };
 
-    // Randomize the deck in a repeatable way by seeding a RNG with the given number and using that
-    // to do swaps of cards in the deck.
-    // The number of permutations of a 52-card deck is 52!, which is a 226-bit number, and we're
-    // only using a 64-bit seed, and not doing this n a meticulous way, so obviously this can't
-    // generate all possible decks, but it's proooooobably good enough.
-    let mut rand = <Pcg32 as SeedableRng>::seed_from_u64(seed);
-    for i in 0 .. deck.len() {
-        let j = rand.gen_range(i, deck.len());
-        deck.swap(i, j);
-    }
 
-    let mut game = GameState::new(seed, deck);
-    let ui = ui::CursesUI::new();
-
-    loop {
+    let mut input_file: Option<BufReader<File>> = None;
+    'main: loop {
         ui.render(&game);
 
-        let action = loop {
-            let input = match ui.get_input() {
-                None => break Action::Quit,
-                Some(line) => line,
+        let action = 'action: loop {
+            let input = if let Some(file) = input_file.as_mut() {
+                let mut line = String::new();
+                file.read_line(&mut line).unwrap();
+                line = line.trim().to_owned();
+                if line.is_empty() {
+                    input_file = None;
+                    continue;
+                }
+                line
+            } else {
+                loop {
+                    let input = match ui.get_input() {
+                        None => break 'action Action::Quit,
+                        Some(line) => line,
+                    };
+
+                    if input.to_ascii_lowercase().starts_with("load ") {
+                        input_file = match File::open((&input[5..]).trim()) {
+                            Ok(f) => Some(BufReader::new(f)),
+                            Err(e) => {
+                                ui.write(&e.to_string());
+                                continue;
+                            }
+                        };
+                        continue 'main;
+                    }
+
+                    break input;
+                }
             };
 
             match input.parse::<Action>() {
