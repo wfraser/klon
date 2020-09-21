@@ -227,6 +227,7 @@ impl CursesUI {
         let prompt = "your move: ";
         self.text_window.mv(0, 0);
         self.text_window.clrtoeol();
+        self.text_window.refresh();
         self.text_window.addstr(prompt);
         self.text_window.refresh();
         curs_set(1); // turn on cursor while we're getting input
@@ -255,6 +256,8 @@ impl CursesUI {
         // Clear the text line under the prompt before returning.
         self.text_window.mv(1, 0);
         self.text_window.deleteln();
+        self.text_window.mv(0,0);
+        self.text_window.refresh();
         Some(line)
     }
 
