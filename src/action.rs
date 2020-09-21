@@ -1,3 +1,4 @@
+use std::fmt::{self, Display};
 use std::iter::Peekable;
 
 const UNRECOGNIZED: &str = "unrecognized input. try 'help' or 'quit'";
@@ -8,10 +9,31 @@ pub enum Source {
     Tableau { column: usize, row: usize },
 }
 
+impl Display for Source {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Source::Waste => f.write_str("W"),
+            Source::Tableau { column, row } => write!(f, "{}{}",
+                column + 1,
+                (b'A' + row as u8) as char,
+            ),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum Destination {
     Foundation(usize),
     Tableau(usize),
+}
+
+impl Display for Destination {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Destination::Foundation(idx) => write!(f, "0{}", (b'A' + idx as u8) as char),
+            Destination::Tableau(column) => write!(f, "{}", column + 1),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -21,6 +43,19 @@ pub enum Action {
     Draw,
     Move(Source, Destination),
     QuickMove(Source),
+}
+
+impl Display for Action {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Action::*;
+        match self {
+            Quit => f.write_str("QUIT"),
+            Help => f.write_str("HELP"),
+            Draw => f.write_str("DD"),
+            Move(src, dst) => write!(f, "{}{}", src, dst),
+            QuickMove(src) => src.fmt(f),
+        }
+    }
 }
 
 impl std::str::FromStr for Action {
