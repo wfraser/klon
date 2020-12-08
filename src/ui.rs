@@ -135,6 +135,7 @@ impl CursesUI {
         self.main_window.mvaddstr(0, 0, &format!("game #{}", game.game_number()));
 
         let points = format!("{}pts", game.score());
+        self.main_window.clrtoeol();
         self.main_window.mvaddstr(0, 47 - points.len() as i32, &points);
         self.main_window.refresh();
 

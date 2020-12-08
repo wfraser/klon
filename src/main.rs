@@ -37,6 +37,7 @@ macro_rules! init_array {
 
 struct Game {
     state: GameState,
+    undo: Vec<GameState>,
     ui: CursesUI,
     input_file: Option<BufReader<File>>,
 }
@@ -67,6 +68,7 @@ impl Game {
 
         Self {
             state,
+            undo: vec![],
             ui,
             input_file: None,
         }
@@ -96,6 +98,16 @@ impl Game {
                     self.input_file = Some(BufReader::new(f));
                     continue;
                 }
+                if input.trim().to_ascii_lowercase() == "undo" {
+                    if let Some(state) = self.undo.pop() {
+                        eprintln!("undo");
+                        self.state = state;
+                        self.ui.render(&self.state);
+                    } else {
+                        self.ui.write("no moves to undo");
+                    }
+                    continue;
+                }
             }
 
             break Ok(input);
@@ -123,10 +135,12 @@ impl Game {
                 }
             };
 
+            let prev_state = self.state.clone();
             if let Err(e) = self.state.apply_action(&action) {
                 self.ui.write(e);
                 continue;
             }
+            self.undo.push(prev_state);
 
             if !matches!(action, Action::Help) {
                 writeln!(io::stderr(), "{}", action).unwrap();

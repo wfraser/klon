@@ -102,7 +102,7 @@ pub enum Facing {
     Down,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Stock {
     stock: Vec<Card>,
     waste: Vec<Card>,
@@ -186,7 +186,7 @@ mod test_stock {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GameState {
     game_number: u64,
     stock: Stock,
