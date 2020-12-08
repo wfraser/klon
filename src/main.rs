@@ -150,6 +150,10 @@ impl Game {
             }
         }
     }
+
+    pub fn end(self) -> GameState {
+        self.state
+    }
 }
 
 fn main() {
@@ -177,8 +181,9 @@ fn main() {
 
     let mut game = Game::new(seed);
     game.main_loop();
-    drop(game);
+    let end_state = game.end();
 
     println!("That was game #{}.", seed);
+    println!("You scored {} points.", end_state.score());
     println!("Bye!");
 }

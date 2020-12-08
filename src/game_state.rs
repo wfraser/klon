@@ -192,6 +192,7 @@ pub struct GameState {
     stock: Stock,
     foundation: [Vec<Card>; 4],
     tableau: [Vec<(Card, Facing)>; 7],
+    score: i32,
 }
 
 impl GameState {
@@ -210,6 +211,7 @@ impl GameState {
             stock: Stock::new(cards),
             foundation: init_array!(Vec<Card>, 4, |_| vec![]),
             tableau,
+            score: 0,
         }
     }
 
@@ -300,12 +302,15 @@ impl GameState {
 
                 match (src, dest) {
                     (Source::Waste, &Destination::Foundation(column)) => {
+                        self.score += 10;
                         self.foundation[column].push(self.stock.take().unwrap());
                     }
                     (Source::Waste, &Destination::Tableau(column)) => {
+                        self.score += 5;
                         self.tableau[column].push((self.stock.take().unwrap(), Facing::Up));
                     }
                     (&Source::Tableau { column, row }, &Destination::Foundation(idx)) => {
+                        self.score += 10;
                         self.foundation[idx].push(self.tableau[column].remove(row).0);
                     }
                     (&Source::Tableau { column: src_col, row: src_row },
@@ -326,6 +331,7 @@ impl GameState {
                     {
                         if self.is_bottom_of_tableau(column, row) {
                             // flip card
+                            self.score += 5;
                             self.tableau[column][row].1 = Facing::Up;
                             return Ok(());
                         }
@@ -350,6 +356,7 @@ impl GameState {
 
                 match foundation_idx {
                     Some(i) => {
+                        self.score += 10;
                         self.foundation[i].push(match *src {
                             Source::Waste => self.stock.take().unwrap(),
                             Source::Tableau { column, row } => {
@@ -391,5 +398,9 @@ impl GameState {
 
     pub fn game_number(&self) -> u64 {
         self.game_number
+    }
+
+    pub fn score(&self) -> i32 {
+        self.score
     }
 }
