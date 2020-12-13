@@ -32,10 +32,13 @@ To draw three cards from the deck into the waste, enter `DD`. When the deck has
 been exhausted, this will recycle all the waste cards back into the deck in the
 same order, to be dealt again.
 
+If you want to take back a move, type `undo`.
+
 When you start `klon` without any command-line arguments, it randomizes the
 deck, but it gives you a "game number" that can be used to generate that same
 deck again. Run `klon` with that number as an argument to play it again.
 
-`klon` logs a record of your moves to standard error, which is hidden due to
-the game running in ncurses. You can redirect it to a file to save it, i.e.:
-    `klon 123456789 2>log_123456789`
+`klon` keeps a record of the moves you've made. You can write it to a file by
+typing `log <filename>`. You can load that file and replay the moves in it by
+typing `load <filename>`. The first line of the log file says what game number
+it is for.

@@ -10,7 +10,7 @@ use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg32;
 use std::env::args;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::process::exit;
 
 #[macro_export]
@@ -38,6 +38,7 @@ macro_rules! init_array {
 struct Game {
     state: GameState,
     undo: Vec<GameState>,
+    moves: Vec<Action>,
     ui: CursesUI,
     input_file: Option<BufReader<File>>,
 }
@@ -69,6 +70,7 @@ impl Game {
         Self {
             state,
             undo: vec![],
+            moves: vec![],
             ui,
             input_file: None,
         }
@@ -86,21 +88,35 @@ impl Game {
                         self.input_file = None;
                         continue;
                     }
+                    if line.starts_with('#') {
+                        continue;
+                    }
                     Some(line)
                 }
                 None => self.ui.get_input(),
             };
 
             if let Some(ref input) = input {
-                if input.trim().to_ascii_lowercase().starts_with("load ") {
+                let lc = input.trim().to_ascii_lowercase();
+                if lc.starts_with("load ") {
                     let f = File::open(&input.trim()[5..])
                         .map_err(|e| e.to_string())?;
                     self.input_file = Some(BufReader::new(f));
                     continue;
                 }
-                if input.trim().to_ascii_lowercase() == "undo" {
+                if lc.starts_with("log ") {
+                    let mut f = File::create(&input.trim()[4..])
+                        .map_err(|e| e.to_string())?;
+                    writeln!(f, "# game {}", self.state.game_number()).map_err(|_| "write error")?;
+                    for action in &self.moves {
+                        writeln!(f, "{}", action).map_err(|_| "write error")?;
+                    }
+                    self.ui.write("log file written");
+                    continue;
+                }
+                if lc == "undo" {
                     if let Some(state) = self.undo.pop() {
-                        eprintln!("undo");
+                        self.moves.pop();
                         self.state = state;
                         self.ui.render(&self.state);
                     } else {
@@ -140,11 +156,6 @@ impl Game {
                 self.ui.write(e);
                 continue;
             }
-            self.undo.push(prev_state);
-
-            if !matches!(action, Action::Help) {
-                writeln!(io::stderr(), "{}", action).unwrap();
-            }
 
             if let Action::Quit = action {
                 break;
@@ -154,6 +165,9 @@ impl Game {
                 self.ui.halp();
                 continue;
             }
+
+            self.undo.push(prev_state);
+            self.moves.push(action.clone());
 
             if (0..4)
                 .all(|i| self.state.foundation(i)
