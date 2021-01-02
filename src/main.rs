@@ -186,7 +186,7 @@ impl Game {
 
 fn main() {
     let seed = match args().nth(1).as_deref() {
-        Some("-h") | Some("--help") => {
+        Some("-h") | Some("--help") | Some("-V") | Some("--version") => {
             eprintln!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
             eprintln!("usage: {} [<game number>]", args().next().unwrap());
             exit(1);
