@@ -60,7 +60,7 @@ impl Game {
         // generate all possible decks, but it's proooooobably good enough.
         let mut rand = <Pcg32 as SeedableRng>::seed_from_u64(game_number);
         for i in 0 .. deck.len() {
-            let j = rand.gen_range(i, deck.len());
+            let j = rand.gen_range(i .. deck.len());
             deck.swap(i, j);
         }
 
