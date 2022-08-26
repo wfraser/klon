@@ -1,4 +1,3 @@
-use crate::init_array;
 use crate::action::{Action, Destination, Source};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -197,7 +196,7 @@ pub struct GameState {
 
 impl GameState {
     pub fn new(game_number: u64, mut cards: Vec<Card>) -> Self {
-        let mut tableau = init_array!(Vec<(Card, Facing)>, 7, |_| vec![]);
+        let mut tableau = <[Vec<(Card, Facing)>; 7]>::default();
 
         for (i, column) in tableau.iter_mut().enumerate() {
             for j in 0 ..= i {
@@ -209,7 +208,7 @@ impl GameState {
         Self {
             game_number,
             stock: Stock::new(cards),
-            foundation: init_array!(Vec<Card>, 4, |_| vec![]),
+            foundation: Default::default(),
             tableau,
             score: 0,
         }

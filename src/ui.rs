@@ -1,5 +1,4 @@
 use crate::game_state::{Card, Color as CardColor, Facing, GameState};
-use crate::init_array;
 use pancurses::*;
 
 pub struct CursesUI {
@@ -54,6 +53,28 @@ impl WindowExt for Window {
     fn underline(&self, _enabled: bool) {}
 }
 
+// Used to make an array of a type that needs explicit initialization.
+macro_rules! init_array {
+    ([$ty:ty; $n:literal], $init:expr) => {
+        {
+            use std::mem::{self, MaybeUninit};
+
+            let mut uninit: [MaybeUninit<$ty>; $n] = unsafe {
+                // This is safe because it's an array of MaybeUninit, which do not require
+                // initialization themselves.
+                MaybeUninit::uninit().assume_init()
+            };
+
+            for i in 0 .. $n {
+                uninit[i] = MaybeUninit::new($init(i));
+            }
+
+            // This is safe because the array is fully initialized now.
+            unsafe { mem::transmute::<_, [$ty; $n]>(uninit) }
+        }
+    }
+}
+
 impl CursesUI {
     #[cfg(windows)]
     fn platform_specific_init() {
@@ -95,13 +116,13 @@ impl CursesUI {
         let waste       = newwin(2, 11, 1, 8);
 
         // Stacks of cards:
-        let tableau = init_array!(Window, 7, |i| {
+        let tableau = init_array!([Window; 7], |i| {
             newwin(21, 7, 6, 7 * i as i32)
         });
 
         // The foundation, where cards are stacked up by suit.
         // Just shows one card at a time.
-        let foundation = init_array!(Window, 4, |i| {
+        let foundation = init_array!([Window; 4], |i| {
             newwin(2, 5, 1, 29 + 5 * i as i32)
         });
 

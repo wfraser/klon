@@ -13,28 +13,6 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::process::exit;
 
-#[macro_export]
-macro_rules! init_array {
-    ($ty:ty, $n:literal, $init:expr) => {
-        {
-            use std::mem::{self, MaybeUninit};
-
-            let mut uninit: [MaybeUninit<$ty>; $n] = unsafe {
-                // This is safe because it's an array of MaybeUninit, which do not require
-                // initialization themselves.
-                MaybeUninit::uninit().assume_init()
-            };
-
-            for i in 0 .. $n {
-                uninit[i] = MaybeUninit::new($init(i));
-            }
-
-            // This is safe because the array is fully initialized now.
-            unsafe { mem::transmute::<_, [$ty; $n]>(uninit) }
-        }
-    }
-}
-
 struct Game {
     state: GameState,
     undo: Vec<GameState>,
