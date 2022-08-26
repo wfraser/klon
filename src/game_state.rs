@@ -285,7 +285,7 @@ impl GameState {
                 self.draw_three();
             }
             Action::Move(src, dest) => {
-                let card_ref = self.get_src_card_ref(&src)?;
+                let card_ref = self.get_src_card_ref(src)?;
                 match *dest {
                     Destination::Tableau(column) => {
                         self.can_stack_tableau(card_ref, column)?;

@@ -216,7 +216,7 @@ impl CursesUI {
                 if matches!(facing, Facing::Down) {
                     win.addstr("---\n");
                 } else {
-                    Self::render_card(win, &card);
+                    Self::render_card(win, card);
                     win.color(Color::Gray);
                     win.addstr("\n");
                 }

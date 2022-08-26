@@ -13,7 +13,7 @@ rand = { version = "0.8", default-features = false }
 rand_pcg = "0.3"
 
 [dependencies.pancurses]
-version = "0.16.1"
+version = "0.17.0"
 # Run in the win32 console host, not in an extra window.
 # This limits the graphics significantly, however.
 features = ["win32"]
