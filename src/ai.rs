@@ -41,6 +41,9 @@ impl Solver {
                 if s > best {
                     best = s;
                     stalled = 0;
+                    if self.try_harder {
+                        self.try_harder = false;
+                    }
                 }
             }
             print_stats!();
