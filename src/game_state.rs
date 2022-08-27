@@ -1,6 +1,8 @@
+use std::fmt::Debug;
+
 use crate::action::{Action, Destination, Source};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Suit {
     Spades,
     Clubs,
@@ -41,7 +43,7 @@ impl Suit {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum Rank {
     Ace = 1,
@@ -83,7 +85,7 @@ impl std::fmt::Display for Rank {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Card {
     pub suit: Suit,
     pub rank: Rank,
@@ -95,13 +97,13 @@ impl std::fmt::Debug for Card {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Facing {
     Up,
     Down,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Stock {
     stock: Vec<Card>,
     waste: Vec<Card>,
@@ -137,6 +139,10 @@ impl Stock {
 
     pub fn take(&mut self) -> Option<Card> {
         self.waste.pop()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.stock.is_empty() && self.waste.is_empty()
     }
 }
 
@@ -185,13 +191,46 @@ mod test_stock {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct GameState {
     game_number: u64,
     stock: Stock,
     foundation: [Vec<Card>; 4],
     tableau: [Vec<(Card, Facing)>; 7],
     score: i32,
+}
+
+impl Debug for GameState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("stock: ")?;
+        for c in &self.stock.waste {
+            write!(f, "{:?} ", c)?;
+        }
+        f.write_str("/ ")?;
+        for c in &self.stock.stock {
+            write!(f, "{:?} ", c)?;
+        }
+        f.write_str("\nfoundation: ")?;
+        for stack in &self.foundation {
+            if let Some(last) = stack.last() {
+                write!(f, "{:?} ", last)?;
+            } else {
+                f.write_str("<xx> ")?;
+            }
+        }
+        for i in 0 .. 7 {
+            write!(f, "\ntableau {}: ", i)?;
+            for (c, facing) in &self.tableau[i] {
+                if *facing == Facing::Up {
+                    write!(f, "{:?} ", c)?;
+                } else {
+                    f.write_str("<xx> ")?;
+                }
+            }
+        }
+        f.write_str("\n")?;
+        Ok(())
+    }
 }
 
 impl GameState {
@@ -222,6 +261,10 @@ impl GameState {
         self.stock.stock_size()
     }
 
+    pub fn stock_is_empty(&self) -> bool {
+        self.stock.is_empty()
+    }
+
     pub fn waste(&self) -> &[Card] {
         self.stock.showing()
     }
@@ -232,6 +275,13 @@ impl GameState {
 
     pub fn foundation(&self, idx: usize) -> Option<&Card> {
         self.foundation[idx].last()
+    }
+
+    pub fn can_stack(&self, card: &Card, dest: Destination) -> bool {
+        match dest {
+            Destination::Foundation(column) => self.can_stack_foundation(card, column).is_ok(),
+            Destination::Tableau(column) => self.can_stack_tableau(card, column).is_ok()
+        }
     }
 
     fn can_stack_tableau(&self, card: &Card, column: usize) -> Result<(), &'static str> {
@@ -389,7 +439,7 @@ impl GameState {
         }
     }
 
-    fn is_bottom_of_tableau(&self, column: usize, row: usize) -> bool {
+    pub fn is_bottom_of_tableau(&self, column: usize, row: usize) -> bool {
         self.tableau.get(column)
             .and_then(|cards| cards.get(row + 1))
             .is_none()
@@ -402,4 +452,32 @@ impl GameState {
     pub fn score(&self) -> i32 {
         self.score
     }
+
+    pub fn fingerprint(&self) -> StateFingerprint {
+        let mut f = StateFingerprint {
+            stock: self.stock.stock.clone(),
+            waste: self.stock.waste.clone(),
+            foundation: self.foundation.clone().map(|mut s| s.pop()),
+            tableau: self.tableau.clone(),
+        };
+        f.tableau.sort_unstable_by(|a, b| {
+            a.len().cmp(&b.len())
+                .then_with(|| {
+                    if let (Some((ac, af)), Some((bc, bf))) = (a.first(), b.first()) {
+                        af.cmp(bf).then_with(|| ac.cmp(bc))
+                    } else {
+                        std::cmp::Ordering::Equal
+                    }
+                })
+            });
+        f
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct StateFingerprint {
+    stock: Vec<Card>,
+    waste: Vec<Card>,
+    foundation: [Option<Card>; 4],
+    tableau: [Vec<(Card, Facing)>; 7],
 }

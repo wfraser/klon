@@ -3,7 +3,7 @@ use std::iter::Peekable;
 
 const UNRECOGNIZED: &str = "unrecognized input. try 'help' or 'quit'";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Source {
     Waste,
     Tableau { column: usize, row: usize },
@@ -21,7 +21,7 @@ impl Display for Source {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Destination {
     Foundation(usize),
     Tableau(usize),

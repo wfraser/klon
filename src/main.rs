@@ -1,3 +1,4 @@
+mod ai;
 mod action;
 mod game_state;
 mod ui;
@@ -13,6 +14,29 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::process::exit;
 
+pub fn numbered_deck(game_number: u64) -> Vec<Card> {
+    let mut deck = vec![];
+    for &rank in Rank::all() {
+        for &suit in Suit::all() {
+            let card = Card { suit, rank };
+            deck.push(card);
+        }
+    }
+
+    // Randomize the deck in a repeatable way by seeding a RNG with the given number and using that
+    // to do swaps of cards in the deck.
+    // The number of permutations of a 52-card deck is 52!, which is a 226-bit number, and we're
+    // only using a 64-bit seed, and not doing this n a meticulous way, so obviously this can't
+    // generate all possible decks, but it's proooooobably good enough.
+    let mut rand = <Pcg32 as SeedableRng>::seed_from_u64(game_number);
+    for i in 0 .. deck.len() {
+        let j = rand.gen_range(i .. deck.len());
+        deck.swap(i, j);
+    }
+
+    deck
+}
+
 struct Game {
     state: GameState,
     undo: Vec<GameState>,
@@ -23,25 +47,7 @@ struct Game {
 
 impl Game {
     pub fn new(game_number: u64) -> Self {
-        let mut deck = vec![];
-        for &rank in Rank::all() {
-            for &suit in Suit::all() {
-                let card = Card { suit, rank };
-                deck.push(card);
-            }
-        }
-
-        // Randomize the deck in a repeatable way by seeding a RNG with the given number and using that
-        // to do swaps of cards in the deck.
-        // The number of permutations of a 52-card deck is 52!, which is a 226-bit number, and we're
-        // only using a 64-bit seed, and not doing this n a meticulous way, so obviously this can't
-        // generate all possible decks, but it's proooooobably good enough.
-        let mut rand = <Pcg32 as SeedableRng>::seed_from_u64(game_number);
-        for i in 0 .. deck.len() {
-            let j = rand.gen_range(i .. deck.len());
-            deck.swap(i, j);
-        }
-
+        let deck = numbered_deck(game_number);
         let state = GameState::new(game_number, deck);
         let ui = CursesUI::new();
 
@@ -100,6 +106,15 @@ impl Game {
                     } else {
                         self.ui.write("no moves to undo");
                     }
+                    continue;
+                }
+                if lc == "hint" {
+                    let moves = crate::ai::find_moves(&self.state);
+                    eprintln!("---");
+                    for a in &moves {
+                        eprintln!("{}", a);
+                    }
+                    self.ui.write(&format!("{} possible moves", moves.len()));
                     continue;
                 }
             }
@@ -184,6 +199,19 @@ fn main() {
             u64::from_le_bytes(bytes)
         }
     };
+
+    if args().nth(2).as_deref() == Some("--solve") {
+        let deck = numbered_deck(seed);
+        let initial = GameState::new(seed, deck);
+        let mut solver = ai::Solver::new(initial);
+        solver.solve();
+        let best = solver.best();
+        for a in &best.moves {
+            println!("{}", a);
+        }
+        println!("{} points", best.state.score());
+        return;
+    }
 
     let mut game = Game::new(seed);
     game.main_loop();
