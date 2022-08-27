@@ -3,7 +3,7 @@ mod action;
 mod game_state;
 mod ui;
 
-use crate::action::Action;
+use crate::action::{Action, Destination};
 use crate::game_state::{Card, GameState, Rank, Suit};
 use crate::ui::CursesUI;
 use getrandom::getrandom;
@@ -162,11 +162,7 @@ impl Game {
             self.undo.push(prev_state);
             self.moves.push(action.clone());
 
-            if (0..4)
-                .all(|i| self.state.foundation(i)
-                    .map(|card| card.rank)
-                        == Some(Rank::King))
-            {
+            if self.state.is_win() {
                 self.ui.write("YOU'RE WINNER !"); // lol
             }
         }
@@ -201,15 +197,19 @@ fn main() {
     };
 
     if args().nth(2).as_deref() == Some("--solve") {
+        println!("# game {}", seed);
         let deck = numbered_deck(seed);
         let initial = GameState::new(seed, deck);
         let mut solver = ai::Solver::new(initial);
-        solver.solve();
+        solver.solve(1000, 50);
         let best = solver.best();
-        for a in &best.moves {
+        for mut a in best.moves.iter().cloned() {
+            if let Action::Move(src, Destination::Foundation(_)) = a {
+                a = Action::QuickMove(src);
+            }
             println!("{}", a);
         }
-        println!("{} points", best.state.score());
+        println!("# {} points", best.state.score());
         return;
     }
 

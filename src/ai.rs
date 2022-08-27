@@ -7,6 +7,7 @@ pub struct Solver {
     fringe: Vec<Play>,
     dead: Vec<Play>,
     seen: HashSet<StateFingerprint>,
+    try_harder: bool,
 }
 
 impl Solver {
@@ -20,54 +21,107 @@ impl Solver {
             }],
             dead: vec![],
             seen,
+            try_harder: false,
         }
     }
 
-    pub fn solve(&mut self) {
+    pub fn solve(&mut self, expand: usize, stalled_rounds: usize) {
         let mut i = 0;
-        while !self.fringe.is_empty() {
-            let mut best = 0;
+        let mut stalled = 0;
+        let mut best = 0;
+        macro_rules! print_stats {
+            () => {
+                eprintln!("{}: best({}) fringe({}) dead({}) seen({}) stalled({})",
+                    i, best, self.fringe.len(), self.dead.len(), self.seen.len(), stalled);
+            }
+        }
+        while !self.fringe.is_empty() && stalled < stalled_rounds {
             for d in self.dead.iter().chain(self.fringe.iter()) {
                 let s = d.state.score();
                 if s > best {
                     best = s;
+                    stalled = 0;
                 }
             }
-            eprintln!("{}: best({}) fringe({}) dead({}) seen({})",
-                i, best, self.fringe.len(), self.dead.len(), self.seen.len());
-            self.iter();
+            print_stats!();
+            self.iter(expand);
             i += 1;
+            stalled += 1;
+
+            if stalled == stalled_rounds {
+                if !self.try_harder {
+                    self.try_harder = true;
+                    stalled = 0;
+                }
+            }
         }
+        print_stats!();
     }
 
+    /// Return the best "dead" (either win or failure) gameplay by score and move count.
     pub fn best(&mut self) -> &Play {
-        let (_, x, _) = self.dead.select_nth_unstable_by(0, |a, b| {
-            b.state.score().cmp(&a.state.score())
-        });
-        x
+        self.dead
+            .sort_unstable_by(|a, b| {
+                b.state.score().cmp(&a.state.score())
+                    .then_with(|| a.moves.len().cmp(&b.moves.len()))
+            });
+        &self.dead[0]
     }
 
-    fn iter(&mut self) {
+    /// Sort the fringe by score, descending.
+    pub fn sort(&mut self) {
+        /*if self.try_harder*/ {
+            // Number of moves descending, then score descending.
+            self.fringe.sort_unstable_by(|a, b| {
+                b.moves.len().cmp(&a.moves.len())
+                    .then_with(|| b.state.score().cmp(&a.state.score()))
+            })
+        } /*else {
+            //self.fringe.sort_unstable_by_key(|p| -p.state.score());
+            // Score descending, then number of moves ascending.
+            self.fringe.sort_unstable_by(|a, b| {
+                b.state.score().cmp(&a.state.score())
+                    .then_with(|| a.moves.len().cmp(&b.moves.len()))
+            })
+        }*/
+    }
+
+    fn iter(&mut self, expand: usize) {
         let mut new_fringe = vec![];
-        for play in self.fringe.drain(..) {
+        self.sort();
+        let num = if self.try_harder {
+            //self.fringe.len() / 4
+            // replace with usize::div_ceil when it's stable
+            (self.fringe.len() as f64 / 4.).ceil() as usize
+        } else {
+            self.fringe.len().clamp(0, expand)
+        };
+        for play in self.fringe.drain(..num) {
             let mut any_novel = false;
             for new in play.next() {
                 let is_novel = self.seen.insert(new.state.fingerprint());
                 if is_novel {
                     //eprintln!("--------\n{:?}", new.state);
-
-                    new_fringe.push(new);
-                    any_novel = true;
+                    if new.state.is_win() {
+                        // Win states can be moved to dead immediately.
+                        self.dead.push(new);
+                        self.try_harder = true;
+                    } else {
+                        new_fringe.push(new);
+                        any_novel = true;
+                    }
                 }
             }
             if !any_novel {
+                // This state had no moves that yielded novel states: it is a dead end.
                 self.dead.push(play);
             }
         }
-        std::mem::swap(&mut self.fringe, &mut new_fringe);
+        self.fringe.extend(new_fringe);
     }
 }
 
+#[derive(Clone)]
 pub struct Play {
     pub moves: Vec<Action>,
     pub state: GameState,
@@ -76,25 +130,37 @@ pub struct Play {
 impl Play {
     pub fn next(&self) -> Vec<Self> {
         let mut res = vec![];
+        let mut base = self.clone();
         let mut moves = find_moves(&self.state);
+        if let Some(Action::QuickMove(_)) = moves.last() {
+            // There's no reason to defer a flip of a tableau card, and doing so doesn't invalidate
+            // any subsequent moves, so apply it to the base state immediately.
+            base.apply(moves.pop().unwrap());
+        }
+        for m in &moves {
+            if let Action::Move(_, Destination::Foundation(f)) = m {
+                if base.state.foundation(*f).is_none() {
+                    // Moving an ace to the foundation is always the best move.
+                    // There's no reason to ever defer it.
+                    base.apply(m.clone());
+                    return vec![base];
+                }
+            }
+        }
         if !self.state.stock_is_empty() {
             moves.push(Action::Draw);
         }
         for a in moves {
-            let mut state = self.state.clone();
-            let mut moves = self.moves.clone();
-            if let Err(e) = state.apply_action(&a) {
-                for m in &moves {
-                    println!("{}", m);
-                }
-                println!("-> {}", a);
-                println!("{}", e);
-                panic!("illegal move?!?!");
-            }
-            moves.push(a);
-            res.push(Play { moves, state });
+            let mut g = base.clone();
+            g.apply(a);
+            res.push(g);
         }
         res
+    }
+
+    fn apply(&mut self, a: Action) {
+        self.state.apply_action(&a).expect("illegal move");
+        self.moves.push(a);
     }
 }
 

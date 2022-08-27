@@ -453,12 +453,19 @@ impl GameState {
         self.score
     }
 
+    pub fn is_win(&self) -> bool {
+        self.foundation.iter()
+            .map(|f| f.last().map(|c| c.rank))
+            .all(|r| r == Some(Rank::King))
+    }
+
     pub fn fingerprint(&self) -> StateFingerprint {
         let mut f = StateFingerprint {
             stock: self.stock.stock.clone(),
             waste: self.stock.waste.clone(),
             foundation: self.foundation.clone().map(|mut s| s.pop()),
             tableau: self.tableau.clone(),
+            score: self.score,
         };
         f.tableau.sort_unstable_by(|a, b| {
             a.len().cmp(&b.len())
@@ -480,4 +487,5 @@ pub struct StateFingerprint {
     waste: Vec<Card>,
     foundation: [Option<Card>; 4],
     tableau: [Vec<(Card, Facing)>; 7],
+    score: i32,
 }
