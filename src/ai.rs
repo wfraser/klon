@@ -64,11 +64,11 @@ impl Solver {
     /// Return the best "dead" (either win or failure) gameplay by score and move count.
     pub fn best(&mut self) -> &Play {
         self.dead
-            .sort_unstable_by(|a, b| {
+            .select_nth_unstable_by(0, |a, b| {
                 b.state.score().cmp(&a.state.score())
                     .then_with(|| a.moves.len().cmp(&b.moves.len()))
-            });
-        &self.dead[0]
+            })
+            .1
     }
 
     /// Sort the fringe by score, descending.
