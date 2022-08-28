@@ -141,9 +141,9 @@ impl Play {
             base.apply(moves.pop().unwrap());
         }
         for m in &moves {
-            if let Action::Move(_, Destination::Foundation(f)) = m {
+            if let Action::Move(Source::Tableau { .. }, Destination::Foundation(f)) = m {
                 if base.state.foundation(*f).is_none() {
-                    // Moving an ace to the foundation is always the best move.
+                    // Moving an ace from the tableau to the foundation is always the best move.
                     // There's no reason to ever defer it.
                     base.apply(m.clone());
                     return vec![base];
