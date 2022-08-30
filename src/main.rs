@@ -203,7 +203,7 @@ fn main() {
         let mut solver = ai::Solver::new(initial);
         solver.solve(1000, 50);
         let best = solver.best();
-        for mut a in best.moves.iter().cloned() {
+        for mut a in best.moves.borrow().iter().cloned() {
             if let Action::Move(src, Destination::Foundation(_)) = a {
                 a = Action::QuickMove(src);
             }

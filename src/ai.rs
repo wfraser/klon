@@ -1,4 +1,8 @@
-use std::collections::HashSet;
+use std::cell::RefCell;
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
+use std::rc::Rc;
 
 use crate::action::{Action, Source, Destination};
 use crate::game_state::{Card, GameState, Facing, Rank, StateFingerprint};
@@ -6,17 +10,18 @@ use crate::game_state::{Card, GameState, Facing, Rank, StateFingerprint};
 pub struct Solver {
     fringe: Vec<Play>,
     dead: Vec<Play>,
-    seen: HashSet<StateFingerprint>,
+    seen: HashMap<StateFingerprint, Rc<RefCell<Vec<Action>>>>,
     try_harder: bool,
 }
 
 impl Solver {
     pub fn new(initial: GameState) -> Self {
-        let mut seen = HashSet::new();
-        seen.insert(initial.fingerprint());
+        let mut seen = HashMap::new();
+        let moves = Rc::new(RefCell::new(vec![]));
+        seen.insert(initial.fingerprint(), Rc::clone(&moves));
         Self {
             fringe: vec![Play {
-                moves: vec![],
+                moves,
                 state: initial,
             }],
             dead: vec![],
@@ -28,21 +33,29 @@ impl Solver {
     pub fn solve(&mut self, expand: usize, stalled_rounds: usize) {
         let mut i = 0;
         let mut stalled = 0;
-        let mut best = 0;
+        let mut best_score = 0;
+        let mut best_score_len = usize::MAX;
         macro_rules! print_stats {
             () => {
-                eprintln!("{}: best({}) fringe({}) dead({}) seen({}) stalled({})",
-                    i, best, self.fringe.len(), self.dead.len(), self.seen.len(), stalled);
+                eprintln!("{}: best({}/{}) fringe({}) dead({}) seen({}) stalled({})",
+                    i, best_score, best_score_len, self.fringe.len(),
+                    self.dead.len(), self.seen.len(), stalled);
             }
         }
         while !self.fringe.is_empty() && stalled < stalled_rounds {
             for d in self.dead.iter().chain(self.fringe.iter()) {
                 let s = d.state.score();
-                if s > best {
-                    best = s;
+                if s > best_score {
+                    best_score = s;
+                    best_score_len = d.moves.borrow().len();
                     stalled = 0;
                     if self.try_harder {
                         self.try_harder = false;
+                    }
+                } else if s == best_score {
+                    let len = d.moves.borrow().len();
+                    if len < best_score_len {
+                        best_score_len = len;
                     }
                 }
             }
@@ -66,17 +79,22 @@ impl Solver {
         self.dead
             .select_nth_unstable_by(0, |a, b| {
                 b.state.score().cmp(&a.state.score())
-                    .then_with(|| a.moves.len().cmp(&b.moves.len()))
+                    .then_with(|| a.moves.borrow().len().cmp(&b.moves.borrow().len()))
             })
             .1
     }
 
     /// Sort the fringe, placing next states to explore at the end.
     pub fn sort(&mut self) {
+        /*self.fringe.sort_unstable_by(|a, b| {
+            b.moves.borrow().len().cmp(&a.moves.borrow().len())
+                .then_with(|| a.state.score().cmp(&b.state.score()))
+        })*/
+
         /*if self.try_harder*/ {
             // Number of moves ascending, then score ascending.
             self.fringe.sort_unstable_by(|a, b| {
-                a.moves.len().cmp(&b.moves.len())
+                a.moves.borrow().len().cmp(&b.moves.borrow().len())
                     .then_with(|| a.state.score().cmp(&b.state.score()))
             })
         } /*else {
@@ -101,8 +119,8 @@ impl Solver {
         let to_explore = self.fringe.split_off(split_idx);
         for play in to_explore {
             let mut any_novel = false;
-            for new in play.next() {
-                if self.is_novel(&new) {
+            for mut new in play.next() {
+                if self.is_novel(&mut new) {
                     if new.state.is_win() {
                         // Win states can be moved to dead immediately.
                         self.dead.push(new);
@@ -121,15 +139,52 @@ impl Solver {
         self.fringe.extend(new_fringe);
     }
 
-    fn is_novel(&mut self, play: &Play) -> bool {
-        self.seen.insert(play.state.fingerprint())
+    fn is_novel(&mut self, play: &mut Play) -> bool {
+        match self.seen.entry(play.state.fingerprint()) {
+            Entry::Occupied(mut e) => {
+                let cur_len = play.moves.borrow().len();
+                let prev_len = e.get().borrow().len();
+                match prev_len.cmp(&cur_len) {
+                    Ordering::Less => {
+                        // Update the play's moveset with the shorter stored one.
+                        play.moves = Rc::clone(e.get());
+                    },
+                    Ordering::Greater => {
+                        // Update the stored moveset with this play's shorter one, and make this
+                        // play refer to the stored one.
+                        let moves_rc = std::mem::replace(&mut play.moves, Rc::clone(e.get()));
+                        let moves = Rc::try_unwrap(moves_rc)
+                            .unwrap_or_else(|rc| (*rc).clone())
+                            .into_inner();
+                        e.get_mut().replace(moves);
+                    },
+                    Ordering::Equal => {
+                        // Make the play refer to the stored moveset.
+                        play.moves = Rc::clone(e.get());
+                    }
+                }
+                false
+            }
+            Entry::Vacant(e) => {
+                e.insert(Rc::clone(&play.moves));
+                true
+            }
+        }
     }
 }
 
-#[derive(Clone)]
 pub struct Play {
-    pub moves: Vec<Action>,
+    pub moves: Rc<RefCell<Vec<Action>>>,
     pub state: GameState,
+}
+
+impl Clone for Play {
+    fn clone(&self) -> Self {
+        Self {
+            state: self.state.clone(),
+            moves: Rc::new(RefCell::new(self.moves.borrow().clone())),
+        }
+    }
 }
 
 impl Play {
@@ -165,7 +220,7 @@ impl Play {
 
     fn apply(&mut self, a: Action) {
         self.state.apply_action(&a).expect("illegal move");
-        self.moves.push(a);
+        self.moves.borrow_mut().push(a);
     }
 }
 
