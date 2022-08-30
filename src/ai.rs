@@ -71,20 +71,20 @@ impl Solver {
             .1
     }
 
-    /// Sort the fringe by score, descending.
+    /// Sort the fringe, placing next states to explore at the end.
     pub fn sort(&mut self) {
         /*if self.try_harder*/ {
-            // Number of moves descending, then score descending.
+            // Number of moves ascending, then score ascending.
             self.fringe.sort_unstable_by(|a, b| {
-                b.moves.len().cmp(&a.moves.len())
-                    .then_with(|| b.state.score().cmp(&a.state.score()))
+                a.moves.len().cmp(&b.moves.len())
+                    .then_with(|| a.state.score().cmp(&b.state.score()))
             })
         } /*else {
-            //self.fringe.sort_unstable_by_key(|p| -p.state.score());
-            // Score descending, then number of moves ascending.
+            //self.fringe.sort_unstable_by_key(|p| p.state.score());
+            // Score ascending, then number of moves descending.
             self.fringe.sort_unstable_by(|a, b| {
-                b.state.score().cmp(&a.state.score())
-                    .then_with(|| a.moves.len().cmp(&b.moves.len()))
+                a.state.score().cmp(&b.state.score())
+                    .then_with(|| b.moves.len().cmp(&a.moves.len()))
             })
         }*/
     }
@@ -92,19 +92,17 @@ impl Solver {
     fn iter(&mut self, expand: usize) {
         let mut new_fringe = vec![];
         self.sort();
-        let num = if self.try_harder {
-            //self.fringe.len() / 4
+        let split_idx = if self.try_harder {
             // replace with usize::div_ceil when it's stable
-            (self.fringe.len() as f64 / 4.).ceil() as usize
+            self.fringe.len() - (self.fringe.len() as f64 / 4.).ceil() as usize
         } else {
-            self.fringe.len().clamp(0, expand)
+            self.fringe.len().saturating_sub(expand)
         };
-        for play in self.fringe.drain(..num) {
+        let to_explore = self.fringe.split_off(split_idx);
+        for play in to_explore {
             let mut any_novel = false;
             for new in play.next() {
-                let is_novel = self.seen.insert(new.state.fingerprint());
-                if is_novel {
-                    //eprintln!("--------\n{:?}", new.state);
+                if self.is_novel(&new) {
                     if new.state.is_win() {
                         // Win states can be moved to dead immediately.
                         self.dead.push(new);
@@ -121,6 +119,10 @@ impl Solver {
             }
         }
         self.fringe.extend(new_fringe);
+    }
+
+    fn is_novel(&mut self, play: &Play) -> bool {
+        self.seen.insert(play.state.fingerprint())
     }
 }
 
